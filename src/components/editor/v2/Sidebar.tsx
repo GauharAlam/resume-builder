@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutGrid, User, Trophy, FileText, Mail, Briefcase, LogOut, History, Award, Bot } from 'lucide-react';
+import { LayoutGrid, User, Trophy, FileText, Mail, Briefcase, LogOut, History, Award, Bot, Palette, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context';
 
@@ -60,7 +60,21 @@ const Sidebar: React.FC = () => {
           </button>
         ))}
 
-        <div className="mt-2 pt-3 border-t border-gray-100">
+        <div className="mt-2 pt-3 border-t border-gray-100 flex flex-col gap-3">
+          <button
+            className="p-3 rounded-xl flex items-center justify-center transition-all w-full text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-theme-panel'))}
+            title="Theme Settings"
+          >
+            <Palette size={20} className="stroke-[2.5px]" />
+          </button>
+          <button
+            className="p-3 rounded-xl flex items-center justify-center transition-all w-full text-blue-500 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-share-modal'))}
+            title="Share Resume"
+          >
+            <Share2 size={20} className="stroke-[2.5px]" />
+          </button>
           <button
             className="p-3 rounded-xl flex items-center justify-center transition-all w-full text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-100"
             onClick={() => window.dispatchEvent(new CustomEvent('open-chatbot'))}

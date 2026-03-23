@@ -6,10 +6,15 @@ import SidebarV2 from '@/components/editor/v2/Sidebar';
 import EditorPanelV2 from '@/components/editor/v2/EditorPanel';
 import PreviewPanelV2 from '@/components/editor/v2/PreviewPanel';
 import LinkedInImportModal from '@/components/editor/LinkedInImportModal';
+import ShareModal from '@/components/editor/ShareModal';
+import ThemePanel from '@/components/editor/ThemePanel';
+import { Palette } from 'lucide-react';
 import { Chatbot } from '@/components/editor'; // Keep chatbot if needed
 
 const EditorContent: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   const { loadResume, createNewResume, resumeData, isLoading, resumeHistory } = useResume();
@@ -19,11 +24,19 @@ const EditorContent: React.FC = () => {
   useEffect(() => {
     const handleOpenModal = () => setIsLinkedInModalOpen(true);
     const handleOpenChat = () => setIsChatOpen(true);
+    const handleOpenTheme = () => setIsThemePanelOpen(true);
+    const handleOpenShare = () => setIsShareModalOpen(true);
+
     window.addEventListener('open-linkedin-modal', handleOpenModal);
     window.addEventListener('open-chatbot', handleOpenChat);
+    window.addEventListener('open-theme-panel', handleOpenTheme);
+    window.addEventListener('open-share-modal', handleOpenShare);
+
     return () => {
       window.removeEventListener('open-linkedin-modal', handleOpenModal);
       window.removeEventListener('open-chatbot', handleOpenChat);
+      window.removeEventListener('open-theme-panel', handleOpenTheme);
+      window.removeEventListener('open-share-modal', handleOpenShare);
     };
   }, []);
 
@@ -72,6 +85,36 @@ const EditorContent: React.FC = () => {
 
       {/* LinkedIn Import Modal */}
       <LinkedInImportModal isOpen={isLinkedInModalOpen} onClose={() => setIsLinkedInModalOpen(false)} />
+
+      {/* Share Modal */}
+      <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+
+      {/* Theme Sidebar Overlay */}
+      {isThemePanelOpen && (
+        <div className="fixed inset-0 z-[60] flex justify-end">
+          <div 
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-300" 
+            onClick={() => setIsThemePanelOpen(false)}
+          />
+          <div className="relative w-80 h-full bg-white shadow-2xl border-l border-gray-200 flex flex-col animate-in slide-in-from-right-full duration-300">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+                <Palette size={16} className="text-emerald-600" />
+                Theme Settings
+              </h2>
+              <button 
+                onClick={() => setIsThemePanelOpen(false)}
+                className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+              >
+                <span className="text-xl">×</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <ThemePanel />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

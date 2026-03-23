@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { useResume } from '@/hooks';
-import { Download, FileText, Mail, Phone, MapPin, Globe, Linkedin, Award, BookOpen, Briefcase, Code, CheckCircle2, User, ExternalLink, Share2, Palette } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import { generateDocx } from '@/utils/docxExport';
-import { TemplateID, ResumeData } from '@/types';
+import { TemplateID } from '@/types';
 
 declare global { interface Window { jspdf: any; html2canvas: any; } }
 
@@ -11,16 +11,12 @@ import ModernTemplate from '../../templates/ModernTemplate';
 import StartupTemplate from '../../templates/StartupTemplate';
 import ElegantTemplate from '../../templates/ElegantTemplate';
 import MinimalistSidebarTemplate from '../../templates/MinimalistSidebarTemplate';
-import ShareModal from '../ShareModal';
-import ThemePanel from '../ThemePanel';
 
 // --- Main Panel Wrapper ---
 
 const PreviewPanel: React.FC = () => {
   const { resumeData, updateResumeData, template, setTemplate } = useResume();
   const previewRef = useRef<HTMLDivElement>(null);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
   const currentTemplateId = template;
 
   const templates: { id: TemplateID; name: string }[] = [
@@ -120,18 +116,6 @@ const PreviewPanel: React.FC = () => {
             </div>
         </div>
         <div className="flex gap-2 items-center">
-            <button 
-              onClick={() => setIsThemePanelOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-all bg-white"
-            >
-               <Palette size={15} className="text-emerald-600" /> Theme
-            </button>
-            <button 
-              onClick={() => setIsShareModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-50 transition-all bg-emerald-50/10 mr-1"
-            >
-               <Share2 size={15} /> Share
-            </button>
             <button onClick={() => generateDocx(resumeData)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors bg-white">
                <FileText size={15} className="text-emerald-600" /> DOCX
             </button>
@@ -150,35 +134,6 @@ const PreviewPanel: React.FC = () => {
            {renderTemplate()}
          </div>
       </div>
-      
-      <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
-
-      {/* Theme Sidebar Overlay */}
-      {isThemePanelOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div 
-            className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-300" 
-            onClick={() => setIsThemePanelOpen(false)}
-          />
-          <div className="relative w-80 h-full bg-white shadow-2xl border-l border-gray-200 flex flex-col animate-in slide-in-from-right-full duration-300">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
-                <Palette size={16} className="text-emerald-600" />
-                Theme Settings
-              </h2>
-              <button 
-                onClick={() => setIsThemePanelOpen(false)}
-                className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
-              >
-                <span className="text-xl">×</span>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              <ThemePanel />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
