@@ -33,6 +33,35 @@ const PublicResumePage: React.FC = () => {
         fetchPublicResume();
     }, [shareId]);
 
+    useEffect(() => {
+        if (!resumeData) return;
+
+        const ownerName = resumeData.personalDetails?.fullName || 'Professional';
+        const role = resumeData.personalDetails?.jobTitle || 'Resume';
+        const pageTitle = `${ownerName} - ${role} | ResumeAI`;
+        const description = `View ${ownerName}'s ${role} resume, shared via ResumeAI.`;
+        const url = window.location.href;
+
+        document.title = pageTitle;
+
+        const setMetaTag = (selector: string, attribute: 'name' | 'property', attrValue: string, content: string) => {
+            let tag = document.querySelector(selector) as HTMLMetaElement | null;
+            if (!tag) {
+                tag = document.createElement('meta');
+                tag.setAttribute(attribute, attrValue);
+                document.head.appendChild(tag);
+            }
+            tag.setAttribute('content', content);
+        };
+
+        setMetaTag('meta[name="description"]', 'name', 'description', description);
+        setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
+        setMetaTag('meta[property="og:description"]', 'property', 'og:description', description);
+        setMetaTag('meta[property="og:url"]', 'property', 'og:url', url);
+        setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', pageTitle);
+        setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+    }, [resumeData]);
+
     const renderTemplate = () => {
         if (!resumeData) return null;
         

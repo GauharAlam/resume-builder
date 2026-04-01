@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { ResumeData, TemplateID, SaveStatus, Experience, Education, Link, Project, Accomplishment } from '@/types';
 import { useAuth } from '@/context';
 import apiRequest from '@/services/api';
+import { trackEvent } from '@/services/analytics';
 
 // --- Debounce utility ---
 const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
@@ -61,6 +62,120 @@ const initialResumeData: ResumeData = {
         { id: crypto.randomUUID(), degree: 'Master of Business Administration (MBA)', institution: 'Stanford University', startDate: '2015', endDate: '2017' }
     ],
     skills: 'Product Management, Agile Methodologies, JIRA, Roadmapping, User Research, A/B Testing, Data Analysis',
+};
+
+const buildStarterResumeData = (starterKey: string | null): ResumeData | null => {
+    if (!starterKey) return null;
+
+    switch (starterKey) {
+        case 'software-engineer':
+            return {
+                personalDetails: {
+                    fullName: 'Alex Morgan',
+                    jobTitle: 'Software Engineer',
+                    email: 'alex.morgan@email.com',
+                    phone: '555-222-1100',
+                    location: 'Austin, TX',
+                    links: [{ id: crypto.randomUUID(), name: 'GitHub', url: 'github.com/alexmorgan' }],
+                },
+                summary: 'Results-driven Software Engineer with 4+ years of experience building scalable web applications, improving performance, and shipping product features used by thousands of users.',
+                experience: [
+                    {
+                        id: crypto.randomUUID(),
+                        jobTitle: 'Software Engineer',
+                        company: 'NovaTech',
+                        startDate: 'Mar 2022',
+                        endDate: 'Present',
+                        description: '• Built and launched 12+ product features across React and Node.js, improving weekly active usage by 21%.\n• Optimized API and database queries, reducing average response times by 35%.',
+                    }
+                ],
+                education: [
+                    { id: crypto.randomUUID(), degree: 'B.S. Computer Science', institution: 'University of Texas', startDate: '2017', endDate: '2021' },
+                ],
+                skills: 'TypeScript, React, Node.js, Express, PostgreSQL, Redis, AWS, Docker, Git, REST APIs',
+                projects: [
+                    { id: crypto.randomUUID(), name: 'Real-time Collaboration Tool', description: '• Developed live editing and comments with websocket architecture supporting 5k+ sessions.', url: 'github.com/alexmorgan/collab-tool' },
+                ],
+                accomplishments: [
+                    { id: crypto.randomUUID(), description: '• Mentored 3 junior engineers and improved onboarding speed by 30%.' },
+                ],
+                sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
+                accentColor: '#059669',
+                customization: { fontFamily: 'sans', fontSize: 'medium', layout: 'standard' },
+            };
+        case 'product-manager':
+            return {
+                personalDetails: {
+                    fullName: 'Taylor Reed',
+                    jobTitle: 'Product Manager',
+                    email: 'taylor.reed@email.com',
+                    phone: '555-778-3400',
+                    location: 'Seattle, WA',
+                    links: [{ id: crypto.randomUUID(), name: 'LinkedIn', url: 'linkedin.com/in/taylorreed' }],
+                },
+                summary: 'Strategic Product Manager with 6+ years of experience leading cross-functional teams, defining product roadmaps, and delivering customer-centered SaaS solutions.',
+                experience: [
+                    {
+                        id: crypto.randomUUID(),
+                        jobTitle: 'Senior Product Manager',
+                        company: 'CloudFlow',
+                        startDate: 'Jan 2021',
+                        endDate: 'Present',
+                        description: '• Owned roadmap execution for onboarding and retention initiatives, increasing activation rate by 18%.\n• Partnered with design and engineering to ship 9 major releases in 12 months.',
+                    }
+                ],
+                education: [
+                    { id: crypto.randomUUID(), degree: 'MBA', institution: 'University of Washington', startDate: '2016', endDate: '2018' },
+                ],
+                skills: 'Product Strategy, Roadmapping, User Research, A/B Testing, SQL, Agile, Jira, Stakeholder Management, Data Analysis',
+                projects: [
+                    { id: crypto.randomUUID(), name: 'Self-Serve Onboarding Revamp', description: '• Led product discovery and launch resulting in faster time-to-value for new users.' },
+                ],
+                accomplishments: [
+                    { id: crypto.randomUUID(), description: '• Presented quarterly product review to executive leadership and secured additional headcount.' },
+                ],
+                sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
+                accentColor: '#0EA5E9',
+                customization: { fontFamily: 'sans', fontSize: 'medium', layout: 'standard' },
+            };
+        case 'ui-ux-designer':
+            return {
+                personalDetails: {
+                    fullName: 'Jordan Lee',
+                    jobTitle: 'UI/UX Designer',
+                    email: 'jordan.lee@email.com',
+                    phone: '555-981-4432',
+                    location: 'San Diego, CA',
+                    links: [{ id: crypto.randomUUID(), name: 'Portfolio', url: 'dribbble.com/jordanlee' }],
+                },
+                summary: 'Creative UI/UX Designer focused on building intuitive, accessible digital products with strong visual systems and measurable business outcomes.',
+                experience: [
+                    {
+                        id: crypto.randomUUID(),
+                        jobTitle: 'Product Designer',
+                        company: 'PixelPath',
+                        startDate: 'May 2020',
+                        endDate: 'Present',
+                        description: '• Redesigned key conversion flows, increasing checkout completion by 14%.\n• Built and maintained a reusable design system used across 4 product squads.',
+                    }
+                ],
+                education: [
+                    { id: crypto.randomUUID(), degree: 'B.A. Design', institution: 'California State University', startDate: '2015', endDate: '2019' },
+                ],
+                skills: 'Figma, Prototyping, Interaction Design, Design Systems, User Research, Usability Testing, Information Architecture, Accessibility',
+                projects: [
+                    { id: crypto.randomUUID(), name: 'Mobile Banking Redesign', description: '• Delivered a mobile-first redesign focused on trust, clarity, and task completion.' },
+                ],
+                accomplishments: [
+                    { id: crypto.randomUUID(), description: '• Won internal innovation award for onboarding flow concepts.' },
+                ],
+                sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
+                accentColor: '#F59E0B',
+                customization: { fontFamily: 'sans', fontSize: 'medium', layout: 'standard' },
+            };
+        default:
+            return null;
+    }
 };
 
 // --- Context Types ---
@@ -272,7 +387,7 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setSaveStatus('saved');
         } catch (error) {
             console.error("Failed to save resume:", error);
-            setSaveStatus('saved');
+            setSaveStatus('error');
         }
     }, [token, isAuthenticated]);
 
@@ -297,21 +412,44 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isAuthenticated || !token) return null;
 
         try {
-            const payload = { title: 'Untitled Resume', resumeData: initialResumeData };
-            const savedResume = await apiRequest('/resumes', {
+            const starterKey = localStorage.getItem('starter_resume_key');
+            const starterTitle = localStorage.getItem('starter_resume_title');
+            const starterResumeData = buildStarterResumeData(starterKey);
+            const wasFirstResume = stateRef.current.resumeHistory.length === 0;
+            const payload = {
+                title: starterTitle || 'Untitled Resume',
+                resumeData: starterResumeData || initialResumeData
+            };
+            const response = await apiRequest('/resumes', {
                 method: 'POST',
                 token,
                 body: JSON.stringify(payload)
             });
 
+            if (!response || !response.success || !response.data) {
+                throw new Error('Unexpected response when creating resume.');
+            }
+
+            const savedResume = response.data;
             setActiveResumeId(savedResume._id);
             setCurrentTitle(savedResume.title);
             setResumeHistory(prev => [savedResume, ...prev].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
             updateStateAndHistory(savedResume.resumeData, true);
+            setSaveStatus('saved');
+            localStorage.removeItem('starter_resume_key');
+            localStorage.removeItem('starter_resume_title');
+
+            if (wasFirstResume) {
+                trackEvent('funnel_first_resume_created', {
+                    source: starterKey || 'blank',
+                    resumeId: savedResume._id,
+                });
+            }
 
             return savedResume._id; // <-- return the newly created resume ID
         } catch (error) {
             console.error('Failed to create new resume:', error);
+            setSaveStatus('error');
             return null;
         }
     }, [isAuthenticated, token]);
@@ -382,6 +520,10 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }));
                 // We also need to update the resume history to keep it in sync
                 setResumeHistory(prev => prev.map(r => r._id === activeResumeId ? { ...r, isPublic: updatedResume.isPublic, shareId: updatedResume.shareId } : r));
+
+                if (isPublic) {
+                    trackEvent('funnel_resume_shared', { resumeId: activeResumeId });
+                }
             }
         } catch (error) {
             console.error('Failed to toggle sharing:', error);

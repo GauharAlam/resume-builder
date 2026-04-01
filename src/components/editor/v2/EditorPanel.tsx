@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useResume } from '@/hooks';
 import SectionCard from './SectionCard';
 import InputField from './InputField';
 import { improveText } from '@/services/geminiService';
 import { Sparkles, Loader2, Undo2, Redo2, Download } from 'lucide-react';
+import { SaveStatusIndicator } from '@/components/common';
+import { ResumeScore, CoverLetterGenerator } from '@/components/editor';
 
 const EditorPanel: React.FC = () => {
   const {
@@ -29,9 +31,91 @@ const EditorPanel: React.FC = () => {
     redo,
     canUndo,
     canRedo,
+    saveStatus,
+    activeResumeId,
   } = useResume();
 
   const [improvingId, setImprovingId] = useState<string | null>(null);
+  const [showATS, setShowATS] = useState(false);
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
+  const [hasAtsRun, setHasAtsRun] = useState(false);
+  const [hasExported, setHasExported] = useState(false);
+
+  useEffect(() => {
+    if (!activeResumeId) {
+      setHasAtsRun(false);
+      setHasExported(false);
+      return;
+    }
+
+    setHasAtsRun(localStorage.getItem(`resumeAtsScanned:${activeResumeId}`) === 'true');
+    setHasExported(localStorage.getItem(`resumeExported:${activeResumeId}`) === 'true');
+  }, [activeResumeId]);
+
+  useEffect(() => {
+    const onAtsRun = (event: Event) => {
+      const customEvent = event as CustomEvent<{ resumeId?: string }>;
+      if (customEvent.detail?.resumeId && customEvent.detail.resumeId === activeResumeId) {
+        setHasAtsRun(true);
+      }
+    };
+
+    const onExport = (event: Event) => {
+      const customEvent = event as CustomEvent<{ resumeId?: string }>;
+      if (customEvent.detail?.resumeId && customEvent.detail.resumeId === activeResumeId) {
+        setHasExported(true);
+      }
+    };
+
+    window.addEventListener('resume-ats-analyzed', onAtsRun);
+    window.addEventListener('resume-exported', onExport);
+    return () => {
+      window.removeEventListener('resume-ats-analyzed', onAtsRun);
+      window.removeEventListener('resume-exported', onExport);
+    };
+  }, [activeResumeId]);
+
+  const experienceBulletCount = useMemo(() => {
+    return (resumeData.experience || []).reduce((count, exp) => {
+      const lines = (exp.description || '')
+        .split('\n')
+        .map((line) => line.replace(/<[^>]*>/g, '').trim())
+        .filter((line) => line.length > 0);
+      return count + lines.length;
+    }, 0);
+  }, [resumeData.experience]);
+
+  const basicsDone = !!resumeData.personalDetails.fullName?.trim()
+    && !!resumeData.personalDetails.jobTitle?.trim()
+    && !!resumeData.personalDetails.email?.trim();
+
+  const checklistItems = useMemo(() => [
+    {
+      id: 'basics',
+      label: 'Complete basic details',
+      done: basicsDone,
+    },
+    {
+      id: 'experience',
+      label: 'Add at least 2 experience bullets',
+      done: experienceBulletCount >= 2,
+    },
+    {
+      id: 'ats',
+      label: 'Run ATS analysis',
+      done: hasAtsRun,
+    },
+    {
+      id: 'export',
+      label: 'Export as PDF/DOCX',
+      done: hasExported,
+    },
+  ], [basicsDone, experienceBulletCount, hasAtsRun, hasExported]);
+
+  const completionPercent = useMemo(() => {
+    const completed = checklistItems.filter((item) => item.done).length;
+    return Math.round((completed / checklistItems.length) * 100);
+  }, [checklistItems]);
 
   const handleImproveAI = async (id: string, text: string, section: string, onUpdate: (val: string) => void) => {
     if (!text || !text.trim()) return;
@@ -70,12 +154,15 @@ const EditorPanel: React.FC = () => {
 
   return (
     <div className="w-1/3 max-w-[500px] min-w-[400px] bg-gray-50 h-[100dvh] overflow-y-auto p-8 flex-shrink-0 border-r border-gray-200" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-      <div className="mb-8 flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4">
+      <div className="mb-8 flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Edit Resume</h1>
           <p className="text-gray-500 text-sm mt-1">Update to see changes in real-time.</p>
+          <div className="mt-2">
+            <SaveStatusIndicator status={saveStatus} />
+          </div>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <div className="flex items-center gap-1 mr-2 border-r border-gray-200 pr-3">
             <button 
               onClick={undo} disabled={!canUndo}
@@ -90,17 +177,37 @@ const EditorPanel: React.FC = () => {
           </div>
           
           <button 
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors bg-white shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors bg-white shadow-sm whitespace-nowrap"
             onClick={() => window.dispatchEvent(new CustomEvent('open-linkedin-modal'))}
           >
             <Download size={15} /> Import
           </button>
-          <button className="px-3 py-1.5 text-sm font-medium border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors bg-white">
+          <button
+            className={`px-3 py-1.5 text-sm font-medium border rounded-lg transition-colors whitespace-nowrap ${
+              showATS
+                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50 bg-white'
+            }`}
+            onClick={() => setShowATS((prev) => !prev)}
+          >
+            ATS Score
+          </button>
+          <button
+            className={`px-3 py-1.5 text-sm font-medium border rounded-lg transition-colors whitespace-nowrap ${
+              showCoverLetter
+                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50 bg-white'
+            }`}
+            onClick={() => setShowCoverLetter((prev) => !prev)}
+          >
+            Cover Letter
+          </button>
+          <button className="px-3 py-1.5 text-sm font-medium border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors bg-white whitespace-nowrap">
             Preview
           </button>
           <button 
             onClick={manualSave}
-            className="px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+            className="px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
           >
             Save
           </button>
@@ -108,6 +215,34 @@ const EditorPanel: React.FC = () => {
       </div>
 
       <div className="space-y-6 pb-24">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <h2 className="text-sm font-semibold text-gray-800">Resume Completeness</h2>
+            <span className="text-sm font-bold text-emerald-700">{completionPercent}%</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden mb-4">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
+              style={{ width: `${completionPercent}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            {checklistItems.map((item) => (
+              <div key={item.id} className="flex items-center gap-2 text-sm">
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                  item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {item.done ? '✓' : '•'}
+                </span>
+                <span className={item.done ? 'text-gray-800' : 'text-gray-500'}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {showATS && <ResumeScore />}
+        {showCoverLetter && <CoverLetterGenerator />}
+
         {/* BASICS */}
         <div id="section-0">
           <SectionCard title="Basics" defaultOpen={true}>

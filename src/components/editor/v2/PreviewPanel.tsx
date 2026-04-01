@@ -3,6 +3,7 @@ import { useResume } from '@/hooks';
 import { Download, FileText } from 'lucide-react';
 import { generateDocx } from '@/utils/docxExport';
 import { TemplateID } from '@/types';
+import { trackEvent } from '@/services/analytics';
 
 declare global { interface Window { jspdf: any; html2canvas: any; } }
 
@@ -15,7 +16,7 @@ import MinimalistSidebarTemplate from '../../templates/MinimalistSidebarTemplate
 // --- Main Panel Wrapper ---
 
 const PreviewPanel: React.FC = () => {
-  const { resumeData, updateResumeData, template, setTemplate } = useResume();
+  const { resumeData, updateResumeData, template, setTemplate, activeResumeId } = useResume();
   const previewRef = useRef<HTMLDivElement>(null);
   const currentTemplateId = template;
 
@@ -55,6 +56,23 @@ const PreviewPanel: React.FC = () => {
     }
     
     pdf.save(`${resumeData.personalDetails.fullName || 'Resume'}.pdf`);
+
+    if (activeResumeId) {
+      const storageKey = `resumeExported:${activeResumeId}`;
+      localStorage.setItem(storageKey, 'true');
+      window.dispatchEvent(new CustomEvent('resume-exported', { detail: { resumeId: activeResumeId } }));
+      trackEvent('funnel_resume_exported', { format: 'pdf', resumeId: activeResumeId });
+    }
+  };
+
+  const handleDownloadDocx = () => {
+    generateDocx(resumeData);
+    if (activeResumeId) {
+      const storageKey = `resumeExported:${activeResumeId}`;
+      localStorage.setItem(storageKey, 'true');
+      window.dispatchEvent(new CustomEvent('resume-exported', { detail: { resumeId: activeResumeId } }));
+      trackEvent('funnel_resume_exported', { format: 'docx', resumeId: activeResumeId });
+    }
   };
 
   const renderTemplate = () => {
@@ -116,7 +134,7 @@ const PreviewPanel: React.FC = () => {
             </div>
         </div>
         <div className="flex gap-2 items-center">
-            <button onClick={() => generateDocx(resumeData)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors bg-white">
+            <button onClick={handleDownloadDocx} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors bg-white">
                <FileText size={15} className="text-emerald-600" /> DOCX
             </button>
             <button onClick={handleDownloadPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">

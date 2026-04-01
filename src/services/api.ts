@@ -29,13 +29,18 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}) => {
 
     if (!response.ok) {
       // Try to parse error message from backend
-      let errorData = { msg: `HTTP error! status: ${response.status}` }; // Default error
+      let errorData: { message?: string; msg?: string; errors?: Array<{ message?: string }> } = {
+        message: `HTTP error! status: ${response.status}`,
+      };
       try {
         errorData = await response.json();
       } catch (e) {
         // Ignore if response is not JSON
       }
-      throw new Error(errorData.msg);
+      const detailMessage = errorData.errors?.[0]?.message;
+      throw new Error(
+        errorData.message || errorData.msg || detailMessage || `HTTP error! status: ${response.status}`
+      );
     }
 
     // Handle cases where the response might be empty (like DELETE)

@@ -7,7 +7,7 @@ import { AIIcon } from '@/components/icons';
 import { ATSAnalysisResult } from '@/types';
 
 const ResumeScore: React.FC = () => {
-    const { resumeData } = useResume();
+    const { resumeData, activeResumeId } = useResume();
     const [score, setScore] = useState<number | null>(null);
     const [feedback, setFeedback] = useState<string[]>([]);
     const [atsResult, setAtsResult] = useState<ATSAnalysisResult | null>(null);
@@ -37,6 +37,14 @@ const ResumeScore: React.FC = () => {
                 const result = await getGeneralResumeAnalysis(resumeData);
                 setScore(result.score);
                 setFeedback(result.feedback || []);
+            }
+
+            if (activeResumeId) {
+                const storageKey = `resumeAtsScanned:${activeResumeId}`;
+                localStorage.setItem(storageKey, 'true');
+                window.dispatchEvent(
+                    new CustomEvent('resume-ats-analyzed', { detail: { resumeId: activeResumeId } })
+                );
             }
         } catch (err) {
             setError('Failed to analyze resume. Please try again.');

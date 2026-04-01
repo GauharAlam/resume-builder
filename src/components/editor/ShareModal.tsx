@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Globe, X, Share2, ExternalLink } from 'lucide-react';
 import { useResume } from '@/hooks';
+import { trackEvent } from '@/services/analytics';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -32,6 +33,9 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(publicUrl);
     setIsCopied(true);
+    if (resumeData.shareId) {
+      trackEvent('resume_share_link_copied', { shareId: resumeData.shareId });
+    }
     setTimeout(() => setIsCopied(false), 2000);
   };
 

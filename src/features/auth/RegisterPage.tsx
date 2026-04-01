@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-
-const API_URL = "https://backend-resume-delta.vercel.app/api/auth";
+import apiRequest from "@/services/api";
+import { trackEvent } from "@/services/analytics";
 
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState("");
@@ -54,18 +54,16 @@ const RegisterPage: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/register`, {
+      const result = await apiRequest("/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.msg || "Failed to register");
+      if (!result || !result.success) {
+        throw new Error(result?.message || "Failed to register");
       }
 
+      trackEvent("funnel_register_success", { method: "email" });
       setSuccess("Account created successfully! Redirecting...");
       setTimeout(() => navigate("/login"), 2000);
     } catch (err: any) {
