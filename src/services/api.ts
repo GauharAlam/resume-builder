@@ -43,21 +43,26 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}) => {
       );
     }
 
-    // Handle cases where the response might be empty (like DELETE)
     const contentType = response.headers.get('content-type');
-    if (response.status === 204 || !contentType) { // 204 No Content
+    if (response.status === 204 || !contentType) {
       return null;
     }
     if (contentType && contentType.includes('application/json')) {
       return await response.json();
     }
-    // Handle plain text response if necessary
-    // return await response.text();
-    return null; // Return null for unexpected content types
+    return null;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`API request failed for endpoint: ${endpoint}`, error);
-    throw error; // Re-throw the error to be handled by the caller
+    
+    // Check if it's a network error (like CORS or server down)
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new Error(
+        `Network Error: Unable to connect to the server at ${API_BASE_URL}. This is likely due to CORS restrictions or the server being offline. Please check your production environment variables.`
+      );
+    }
+    
+    throw error;
   }
 };
 
