@@ -3,10 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import apiRequest from '@/services/api';
 import { ResumeData, TemplateID } from '@/types';
 import ProfessionalITTemplate from '@/components/templates/ProfessionalITTemplate';
-import ModernTemplate from '@/components/templates/ModernTemplate';
-import StartupTemplate from '@/components/templates/StartupTemplate';
-import ElegantTemplate from '@/components/templates/ElegantTemplate';
-import MinimalistSidebarTemplate from '@/components/templates/MinimalistSidebarTemplate';
+import ATSModernTemplate from '@/components/templates/ATSModernTemplate';
+import StandardClassicTemplate from '@/components/templates/StandardClassicTemplate';
+import TechMinimalistTemplate from '@/components/templates/TechMinimalistTemplate';
 
 const PublicResumePage: React.FC = () => {
     const { shareId } = useParams<{ shareId: string }>();
@@ -65,17 +64,16 @@ const PublicResumePage: React.FC = () => {
     const renderTemplate = () => {
         if (!resumeData) return null;
         
-        // Use the saved template ID, default to modern if not found
-        const templateId = (resumeData as any).template || 'modern';
+        // Use the saved template ID, default to professional-it if not found or invalid
+        const templateId = (resumeData as any).template || 'professional-it';
         const textScale = resumeData.customization?.textScale ?? 1;
 
         switch (templateId) {
             case 'professional-it': return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
-            case 'modern': return <ModernTemplate data={resumeData} />;
-            case 'startup': return <StartupTemplate data={resumeData} />;
-            case 'elegant': return <ElegantTemplate data={resumeData} />;
-            case 'minimalist-sidebar': return <MinimalistSidebarTemplate data={resumeData} />;
-            default: return <ModernTemplate data={resumeData} />;
+            case 'ats-modern': return <ATSModernTemplate data={resumeData} scale={textScale} />;
+            case 'standard-classic': return <StandardClassicTemplate data={resumeData} scale={textScale} />;
+            case 'tech-minimalist': return <TechMinimalistTemplate data={resumeData} scale={textScale} />;
+            default: return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
         }
     };
 

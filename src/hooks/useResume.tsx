@@ -236,7 +236,7 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [activeResumeId, setActiveResumeId] = useState<string | null>(null);
     const [resumeHistory, setResumeHistory] = useState<SavedResume[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [template, setTemplateState] = useState<TemplateID>('modern');
+    const [template, setTemplateState] = useState<TemplateID>('professional-it');
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
     const [currentTitle, setCurrentTitle] = useState<string>('Untitled Resume (Example)');
 

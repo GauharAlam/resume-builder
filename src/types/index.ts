@@ -90,7 +90,7 @@ export interface ATSAnalysisResult {
 }
 
 
-export type TemplateID = 'modern' | 'classic' | 'creative' | 'minimalist' | 'executive' | 'corporate' | 'academic' | 'technical' | 'professional' | 'professional-it' | 'startup' | 'elegant' | 'minimalist-sidebar';
+export type TemplateID = 'professional-it' | 'ats-modern' | 'standard-classic' | 'tech-minimalist';
 
 export type SaveStatus = 'saving' | 'saved' | 'error';
 

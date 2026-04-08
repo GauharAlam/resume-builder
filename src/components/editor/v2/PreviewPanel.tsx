@@ -8,10 +8,9 @@ import { trackEvent } from '@/services/analytics';
 declare global { interface Window { jspdf: any; html2canvas: any; } }
 
 import ProfessionalITTemplate from '../../templates/ProfessionalITTemplate';
-import ModernTemplate from '../../templates/ModernTemplate';
-import StartupTemplate from '../../templates/StartupTemplate';
-import ElegantTemplate from '../../templates/ElegantTemplate';
-import MinimalistSidebarTemplate from '../../templates/MinimalistSidebarTemplate';
+import ATSModernTemplate from '../../templates/ATSModernTemplate';
+import StandardClassicTemplate from '../../templates/StandardClassicTemplate';
+import TechMinimalistTemplate from '../../templates/TechMinimalistTemplate';
 
 // --- Main Panel Wrapper ---
 
@@ -22,10 +21,9 @@ const PreviewPanel: React.FC = () => {
 
   const templates: { id: TemplateID; name: string }[] = [
     { id: 'professional-it', name: 'Professional IT' },
-    { id: 'startup', name: 'Startup' },
-    { id: 'elegant', name: 'Elegant' },
-    { id: 'minimalist-sidebar', name: 'Minimalist Sidebar' },
-    { id: 'modern', name: 'Modern' }
+    { id: 'ats-modern', name: 'ATS Modern' },
+    { id: 'standard-classic', name: 'Standard Classic' },
+    { id: 'tech-minimalist', name: 'Tech Minimalist' }
   ];
 
   const handleDownloadPdf = async () => {
@@ -79,10 +77,9 @@ const PreviewPanel: React.FC = () => {
     const textScale = resumeData.customization?.textScale ?? 1;
     switch (currentTemplateId) {
       case 'professional-it': return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
-      case 'startup': return <StartupTemplate data={resumeData} />;
-      case 'elegant': return <ElegantTemplate data={resumeData} />;
-      case 'minimalist-sidebar': return <MinimalistSidebarTemplate data={resumeData} />;
-      case 'modern': return <ModernTemplate data={resumeData} />;
+      case 'ats-modern': return <ATSModernTemplate data={resumeData} scale={textScale} />;
+      case 'standard-classic': return <StandardClassicTemplate data={resumeData} scale={textScale} />;
+      case 'tech-minimalist': return <TechMinimalistTemplate data={resumeData} scale={textScale} />;
       default: return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
     }
   };
