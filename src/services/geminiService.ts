@@ -4,7 +4,7 @@ import { ResumeData, ATSAnalysisResult } from "@/types";
 
 // FIX: Initialize GoogleGenAI with apiKey from environment variables.
 // For Vite, environment variables must be prefixed with VITE_ and accessed via import.meta.env
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const apiKey = process.env.GEMINI_API_KEY || '';
 console.log("Gemini API Key status:", apiKey ? "Key is present" : "Key is MISSING");
 
 // Initialize the GoogleGenAI client
@@ -261,9 +261,9 @@ export const getChatbotResponse = async (message: string, resumeData: ResumeData
     if (!message) return "Please ask a question.";
 
     // Check if API key is configured
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        console.error("VITE_GEMINI_API_KEY is not configured in .env file");
+        console.error("GEMINI_API_KEY is not configured in .env file");
         return "AI features are not configured. Please add your Gemini API key to the .env file.";
     }
 
