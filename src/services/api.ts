@@ -1,11 +1,15 @@
 // frontend/services/api.ts
 //  const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL  // Your backend URL
 const isLocal = import.meta.env.DEV;
-const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL ||
-  (isLocal
-    ? `http://${window.location.hostname}:5001/api`
-    : 'https://backend-resume-delta.vercel.app/api');
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  if (!isLocal) {
+    throw new Error('CRITICAL: VITE_API_BASE_URL is missing in production environment. Please set it in your hosting provider settings.');
+  }
+}
+
+const FINAL_API_BASE_URL = API_BASE_URL || (isLocal ? `http://${window.location.hostname}:5001/api` : 'https://backend-resume-delta.vercel.app/api');
 
 // https://backend-resume-delta.vercel.app/api
 
@@ -22,7 +26,7 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}) => {
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${FINAL_API_BASE_URL}${endpoint}`, {
       ...fetchOptions,
       headers,
     });
@@ -58,7 +62,7 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}) => {
     // Check if it's a network error (like CORS or server down)
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
       throw new Error(
-        `Network Error: Unable to connect to the server at ${API_BASE_URL}. This is likely due to CORS restrictions or the server being offline. Please check your production environment variables.`
+        `Network Error: Unable to connect to the server at ${FINAL_API_BASE_URL}. This is likely due to CORS restrictions or the server being offline. Please check your production environment variables.`
       );
     }
     
