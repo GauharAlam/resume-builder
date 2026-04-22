@@ -18,16 +18,16 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
     if (!desc) return null;
     // If it looks like HTML (contains <p> or <li>), use dangerouslySetInnerHTML
     if (desc.includes('<p>') || desc.includes('<li>')) {
-      return <div className="mt-1 text-[10pt] [&>ul]:list-disc [&>ul]:ml-5 [&>ol]:list-decimal [&>ol]:ml-5 space-y-1" dangerouslySetInnerHTML={{ __html: desc }}></div>;
+      return <div className="mt-1 text-[10pt] [&>ul]:list-none [&>ul]:ml-1 [&>ul>li]:relative [&>ul>li]:pl-3.5 [&>ul>li::before]:content-['•'] [&>ul>li::before]:absolute [&>ul>li::before]:left-0 [&>ol]:list-decimal [&>ol]:ml-5 space-y-1" dangerouslySetInnerHTML={{ __html: desc }}></div>;
     }
     // Otherwise, treat as plain text and split by newlines, cleaning up manual bullets
     return (
-      <ul className="list-disc ml-5 mt-1 space-y-0.5">
+      <ul className="list-none ml-1 mt-1 space-y-0.5">
         {desc.split('\n')
           .map(l => l.trim().replace(/^[\u2022\-\*\.]\s*/, '')) // Remove leading bullets/dots
           .filter(l => l)
           .map((line, i) => (
-            <li key={i}>{line}</li>
+            <li key={i} className="relative pl-3.5 before:content-['•'] before:absolute before:left-0">{line}</li>
         ))}
       </ul>
     );
