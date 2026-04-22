@@ -115,19 +115,16 @@ const ResumeHistory: React.FC = () => {
                     const pdfWidth = pdf.internal.pageSize.getWidth();
                     const pdfHeight = pdf.internal.pageSize.getHeight();
                     const imgProps = pdf.getImageProperties(imgData);
-                    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                    let heightLeft = imgHeight;
-                    let position = 0;
-
-                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-                    heightLeft -= pdfHeight;
-
-                    while (heightLeft > 1) {
-                        position = position - pdfHeight;
-                        pdf.addPage();
-                        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-                        heightLeft -= pdfHeight;
-                    }
+                    
+                    // Scale the image so it fits perfectly on a single A4 page
+                    const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+                    const scaledWidth = imgProps.width * ratio;
+                    const scaledHeight = imgProps.height * ratio;
+                    
+                    // Center it horizontally
+                    const xOffset = (pdfWidth - scaledWidth) / 2;
+                    
+                    pdf.addImage(imgData, 'PNG', xOffset, 0, scaledWidth, scaledHeight);
 
                     pdf.save(`${resumeToDownload.title || 'resume'}.pdf`);
                 } catch (error) {

@@ -1,20 +1,46 @@
 import React from 'react';
 import { ResumeData } from '@/types';
 
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <div className="border-b-[1.5px] border-black mb-2 pb-0.5">
+    <h3 className="font-bold uppercase text-[10pt] tracking-wide">{title}</h3>
+  </div>
+);
+
 const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ data, scale = 1 }) => {
   const { personalDetails, summary, experience, education, skills, projects, accomplishments, customization } = data;
   
   const baseFontSize = `${11 * scale}pt`; // Standard ATS size is usually 10-12pt
   const fontClass = customization.fontFamily ? `font-${customization.fontFamily}` : 'font-sans';
   
+  // Helper to safely render description strings that might be plain text or HTML
+  const renderDescription = (desc: string) => {
+    if (!desc) return null;
+    // If it looks like HTML (contains <p> or <li>), use dangerouslySetInnerHTML
+    if (desc.includes('<p>') || desc.includes('<li>')) {
+      return <div className="mt-1 text-[10pt] [&>ul]:list-disc [&>ul]:ml-5 [&>ol]:list-decimal [&>ol]:ml-5 space-y-1" dangerouslySetInnerHTML={{ __html: desc }}></div>;
+    }
+    // Otherwise, treat as plain text and split by newlines, cleaning up manual bullets
+    return (
+      <ul className="list-disc ml-5 mt-1 space-y-0.5">
+        {desc.split('\n')
+          .map(l => l.trim().replace(/^[\u2022\-\*\.]\s*/, '')) // Remove leading bullets/dots
+          .filter(l => l)
+          .map((line, i) => (
+            <li key={i}>{line}</li>
+        ))}
+      </ul>
+    );
+  };
+
   return (
     <div 
        className={`flex flex-col text-[#000000] bg-white ${fontClass} w-full leading-normal`}
        style={{ fontSize: baseFontSize, padding: `${0.5 * scale}in`, minHeight: '11in' }}
     >
       {/* Header */}
-      <div className="text-center mb-4">
-        <h1 className="text-[18pt] font-bold mb-1">{personalDetails.fullName}</h1>
+      <div className="text-center mb-5">
+        <h1 className="text-[18pt] font-bold mb-1 tracking-tight">{personalDetails.fullName}</h1>
         <div className="flex justify-center flex-wrap gap-x-3 text-[10pt]">
           {personalDetails.phone && <span>{personalDetails.phone}</span>}
           {personalDetails.phone && personalDetails.email && <span>|</span>}
@@ -35,15 +61,15 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
       {/* Summary */}
       {summary && (
         <div className="mb-4">
-          <h3 className="font-bold border-b border-black uppercase text-[10pt] mb-1">Professional Summary</h3>
-          <p className="text-justify">{summary}</p>
+          <SectionHeader title="Professional Summary" />
+          <div className="text-justify">{renderDescription(summary)}</div>
         </div>
       )}
 
       {/* Education */}
       {education?.length > 0 && (
         <div className="mb-4">
-          <h3 className="font-bold border-b border-black uppercase text-[10pt] mb-1">Education</h3>
+          <SectionHeader title="Education" />
           {education.map(edu => (
             <div key={edu.id} className="mb-2">
               <div className="flex justify-between font-bold">
@@ -62,8 +88,8 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
       {/* Skills */}
       {skills && (
         <div className="mb-4">
-          <h3 className="font-bold border-b border-black uppercase text-[10pt] mb-1">Technical Skills</h3>
-          <p>
+          <SectionHeader title="Technical Skills" />
+          <p className="mt-1">
             {skills}
           </p>
         </div>
@@ -72,7 +98,7 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
       {/* Experience */}
       {experience?.length > 0 && (
         <div className="mb-4">
-          <h3 className="font-bold border-b border-black uppercase text-[10pt] mb-1">Experience</h3>
+          <SectionHeader title="Experience" />
           {experience.map(exp => (
             <div key={exp.id} className="mb-3">
               <div className="flex justify-between font-bold">
@@ -83,13 +109,7 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
                 <span>{exp.jobTitle}</span>
                 <span>{exp.startDate} – {exp.endDate}</span>
               </div>
-              {exp.description && (
-                <ul className="list-disc ml-5 mt-1 space-y-0.5">
-                  {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                    <li key={i}>{line.trim()}</li>
-                  ))}
-                </ul>
-              )}
+              {renderDescription(exp.description)}
             </div>
           ))}
         </div>
@@ -98,7 +118,7 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
       {/* Projects */}
       {projects?.length > 0 && (
         <div className="mb-4">
-          <h3 className="font-bold border-b border-black uppercase text-[10pt] mb-1">Projects</h3>
+          <SectionHeader title="Projects" />
           {projects.map(proj => (
             <div key={proj.id} className="mb-2">
               <div className="flex justify-between items-baseline">
@@ -108,7 +128,7 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
                 </span>
                 <span className="text-[9pt] italic">{proj.technologies || ''}</span>
               </div>
-              <div className="mt-0.5" dangerouslySetInnerHTML={{ __html: proj.description }}></div>
+              {renderDescription(proj.description)}
             </div>
           ))}
         </div>
@@ -117,8 +137,8 @@ const ATSModernTemplate: React.FC<{ data: ResumeData; scale?: number }> = ({ dat
       {/* Accomplishments */}
       {accomplishments?.length > 0 && (
         <div className="mb-4">
-          <h3 className="font-bold border-b border-black uppercase text-[10pt] mb-1">Accomplishments</h3>
-          <ul className="list-disc ml-5 space-y-0.5">
+          <SectionHeader title="Accomplishments" />
+          <ul className="list-disc ml-5 space-y-0.5 mt-1">
             {accomplishments.map(acc => (
               <li key={acc.id}>{acc.description}</li>
             ))}

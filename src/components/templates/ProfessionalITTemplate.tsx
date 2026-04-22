@@ -29,12 +29,12 @@ const ProfessionalITTemplate: React.FC<{ data: ResumeData; scale?: number }> = (
         )}
         
         <div className="flex flex-wrap justify-center items-center gap-x-[1.2em] gap-y-[0.3em] text-[0.85em] text-gray-700 font-medium">
-          {personalDetails.email && <div className="flex items-center gap-[0.3em]"><Mail size="1em" className="text-gray-500" /> {personalDetails.email}</div>}
-          {personalDetails.phone && <div className="flex items-center gap-[0.3em]"><Phone size="1em" className="text-gray-500" /> {personalDetails.phone}</div>}
-          {personalDetails.location && <div className="flex items-center gap-[0.3em]"><MapPin size="1em" className="text-gray-500" /> {personalDetails.location}</div>}
+          {personalDetails.email && <div className="flex items-center gap-[0.3em]"><Mail size="1.1em" className="text-gray-500 translate-y-[0.05em]" /> <span>{personalDetails.email}</span></div>}
+          {personalDetails.phone && <div className="flex items-center gap-[0.3em]"><Phone size="1.1em" className="text-gray-500 translate-y-[0.05em]" /> <span>{personalDetails.phone}</span></div>}
+          {personalDetails.location && <div className="flex items-center gap-[0.3em]"><MapPin size="1.1em" className="text-gray-500 translate-y-[0.05em]" /> <span>{personalDetails.location}</span></div>}
           {personalDetails.links?.map(link => (
             <div key={link.id} className="flex items-center gap-[0.3em]">
-              <Globe size="1em" className="text-gray-500" /> <a href={link.url} className="hover:text-blue-600 transition-colors">{link.name || link.url.replace(/^https?:\/\//, '')}</a>
+              <Globe size="1.1em" className="text-gray-500 translate-y-[0.05em]" /> <a href={link.url} className="hover:text-blue-600 transition-colors"><span>{link.name || link.url.replace(/^https?:\/\//, '')}</span></a>
             </div>
           ))}
         </div>
