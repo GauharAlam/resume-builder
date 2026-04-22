@@ -3,6 +3,8 @@ import { useAuth } from "@/context";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, Loader, ArrowLeft } from "lucide-react";
 import apiRequest from "@/services/api";
+import { trackEvent } from "@/services/analytics";
+import GoogleAuthButton from "./GoogleAuthButton";
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -12,6 +14,11 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const handleAuthSuccess = (token: string) => {
+    login(token);
+    navigate("/history");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +36,8 @@ const LoginPage: React.FC = () => {
       }
 
       const { token, user } = result.data;
-      login(token);
-      navigate("/history");
+      trackEvent("funnel_login_success", { method: "email" });
+      handleAuthSuccess(token);
 
     } catch (err: any) {
       console.error(err);
@@ -56,6 +63,18 @@ const LoginPage: React.FC = () => {
             Welcome back
           </h1>
           <p className="text-gray-500 mt-2 text-sm">Please enter your details to sign in.</p>
+        </div>
+
+        <GoogleAuthButton
+          mode="login"
+          onSuccess={handleAuthSuccess}
+          onError={(message) => setError(message || null)}
+        />
+
+        <div className="my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span>or continue with email</span>
+          <div className="h-px flex-1 bg-gray-200" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

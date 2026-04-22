@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { useAuth } from "@/context";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import apiRequest from "@/services/api";
 import { trackEvent } from "@/services/analytics";
+import GoogleAuthButton from "./GoogleAuthButton";
 
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState("");
@@ -13,7 +15,13 @@ const RegisterPage: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordMatch, setPasswordMatch] = useState(true);
+  const { login } = useAuth();
   const navigate = useNavigate();
+
+  const handleAuthSuccess = (token: string) => {
+    login(token);
+    navigate("/history");
+  };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPassword = e.target.value;
@@ -85,6 +93,18 @@ const RegisterPage: React.FC = () => {
             Create an account
           </h1>
           <p className="text-gray-500 mt-2 text-sm">Start building your optimal resume</p>
+        </div>
+
+        <GoogleAuthButton
+          mode="register"
+          onSuccess={handleAuthSuccess}
+          onError={(message) => setError(message || null)}
+        />
+
+        <div className="my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span>or create an account with email</span>
+          <div className="h-px flex-1 bg-gray-200" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

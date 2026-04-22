@@ -15,6 +15,16 @@ View your app in AI Studio: https://ai.studio/apps/drive/14d6_Yo0lHJJoRxmZQmWEKU
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set the frontend environment variables in `.env` or `.env.local`
+   - `GEMINI_API_KEY=...`
+   - `VITE_API_BASE_URL=http://localhost:5001/api`
+   - `VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com`
 3. Run the app:
    `npm run dev`
+
+## Google Sign-In Setup
+
+To enable Google sign-in, set the same Google OAuth web client ID in both apps:
+
+- Frontend: `VITE_GOOGLE_CLIENT_ID`
+- Backend: `GOOGLE_CLIENT_ID`
