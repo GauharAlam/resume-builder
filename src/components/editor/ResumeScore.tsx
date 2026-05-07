@@ -1,7 +1,7 @@
 // FIX: Implement a component to display AI-driven resume score and feedback.
 import React, { useState, useEffect } from 'react';
 import { useResume } from '@/hooks';
-import { getGeneralResumeAnalysis, getATSAnalysis } from '@/services/geminiService';
+import { getGeneralResumeAnalysis, getATSAnalysis } from '@/services/aiService';
 import { LoadingSpinner } from '@/components/common';
 import { AIIcon } from '@/components/icons';
 import { ATSAnalysisResult } from '@/types';

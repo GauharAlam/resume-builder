@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useResume } from '@/hooks';
 import SectionCard from './SectionCard';
 import InputField from './InputField';
-import { improveText } from '@/services/geminiService';
+import { improveText } from '@/services/aiService';
 import { Sparkles, Loader2, Undo2, Redo2, Download } from 'lucide-react';
 import { SaveStatusIndicator } from '@/components/common';
-import { ResumeScore, CoverLetterGenerator } from '@/components/editor';
+import { ResumeScore, CoverLetterGenerator, AIImproveModal } from '@/components/editor';
 
 const EditorPanel: React.FC = () => {
   const {
@@ -40,6 +40,21 @@ const EditorPanel: React.FC = () => {
   const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [hasAtsRun, setHasAtsRun] = useState(false);
   const [hasExported, setHasExported] = useState(false);
+
+  // AI Modal State
+  const [aiModal, setAiModal] = useState<{
+    isOpen: boolean;
+    oldText: string;
+    newText: string;
+    section: string;
+    onAccept: (val: string) => void;
+  }>({
+    isOpen: false,
+    oldText: '',
+    newText: '',
+    section: '',
+    onAccept: () => {}
+  });
 
   useEffect(() => {
     if (!activeResumeId) {
@@ -122,7 +137,18 @@ const EditorPanel: React.FC = () => {
     setImprovingId(id);
     try {
       const improved = await improveText(text, section, resumeData.personalDetails.jobTitle || 'Professional');
-      if (improved) onUpdate(improved);
+      if (improved) {
+        setAiModal({
+          isOpen: true,
+          oldText: text,
+          newText: improved,
+          section,
+          onAccept: (finalText: string) => {
+            onUpdate(finalText);
+            setAiModal(prev => ({ ...prev, isOpen: false }));
+          }
+        });
+      }
     } catch (error) {
       console.error('Failed to improve text', error);
     } finally {
@@ -242,6 +268,15 @@ const EditorPanel: React.FC = () => {
 
         {showATS && <ResumeScore />}
         {showCoverLetter && <CoverLetterGenerator />}
+        
+        <AIImproveModal 
+          isOpen={aiModal.isOpen}
+          onClose={() => setAiModal(prev => ({ ...prev, isOpen: false }))}
+          oldText={aiModal.oldText}
+          newText={aiModal.newText}
+          section={aiModal.section}
+          onAccept={aiModal.onAccept}
+        />
 
         {/* BASICS */}
         <div id="section-0">

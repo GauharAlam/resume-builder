@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useResume } from '@/hooks';
-import { generateCoverLetter } from '@/services/geminiService';
+import { generateCoverLetter } from '@/services/aiService';
 import { AIIcon, ClipboardIcon } from '@/components/icons';
 import { LoadingSpinner } from '@/components/common';
 
