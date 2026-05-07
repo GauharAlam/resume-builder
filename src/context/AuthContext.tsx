@@ -1,41 +1,40 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 
 interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   login: (token: string) => void;
   logout: () => void;
-  loading: boolean; // ✅ new state
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { getToken, isLoaded, isSignedIn, signOut } = useClerkAuth();
   const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true); // ✅ new state
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken");
-    if (storedToken) {
-      setToken(storedToken);
+    if (isLoaded && isSignedIn) {
+      getToken().then(t => setToken(t));
+    } else if (isLoaded && !isSignedIn) {
+      setToken(null);
     }
-    setLoading(false); // ✅ finish checking
-  }, []);
+  }, [isLoaded, isSignedIn, getToken]);
 
   const login = (newToken: string) => {
-    setToken(newToken);
-    localStorage.setItem("authToken", newToken);
+    // Compatibility stub: login is handled by Clerk UI.
   };
 
   const logout = () => {
-    setToken(null);
-    localStorage.removeItem("authToken");
+    signOut();
   };
 
-  const isAuthenticated = !!token;
+  const isAuthenticated = !!token && isSignedIn;
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated, login, logout, loading }}>
+    <AuthContext.Provider value={{ token, isAuthenticated, login, logout, loading: !isLoaded }}>
       {children}
     </AuthContext.Provider>
   );

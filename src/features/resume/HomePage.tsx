@@ -2,9 +2,11 @@ import React, { useEffect } from "react";
 import { Sparkles, Zap, FileText, ArrowRight, Users, Briefcase, BarChart3, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEventOncePerSession } from "@/services/analytics";
+import { useAuth } from "@/context";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
@@ -30,18 +32,29 @@ const HomePage: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-4">
-           <button 
-             onClick={() => navigate('/login')}
-             className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-           >
-             Log in
-           </button>
-           <button 
-             onClick={() => navigate('/register')}
-             className="text-sm font-medium px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-           >
-             Get Started
-           </button>
+          {isAuthenticated ? (
+            <button 
+              onClick={() => navigate('/history')}
+              className="text-sm font-medium px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              Go to Dashboard
+            </button>
+          ) : (
+            <>
+              <button 
+                onClick={() => navigate('/login')}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                Log in
+              </button>
+              <button 
+                onClick={() => navigate('/register')}
+                className="text-sm font-medium px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                Get Started
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -69,18 +82,20 @@ const HomePage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             <button
-              onClick={() => navigate("/register")}
+              onClick={() => navigate(isAuthenticated ? "/history" : "/register")}
               className="w-full sm:w-auto px-8 py-3.5 bg-emerald-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg hover:bg-emerald-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
             >
-              Start Building Now
+              {isAuthenticated ? "Go to Dashboard" : "Start Building Now"}
               <ArrowRight className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => navigate("/login")}
-              className="w-full sm:w-auto px-8 py-3.5 bg-white text-gray-700 font-medium rounded-lg border border-gray-300 shadow-sm hover:bg-gray-50 hover:-translate-y-0.5 transition-all flex items-center justify-center"
-            >
-              Sign back in
-            </button>
+            {!isAuthenticated && (
+              <button
+                onClick={() => navigate("/login")}
+                className="w-full sm:w-auto px-8 py-3.5 bg-white text-gray-700 font-medium rounded-lg border border-gray-300 shadow-sm hover:bg-gray-50 hover:-translate-y-0.5 transition-all flex items-center justify-center"
+              >
+                Sign back in
+              </button>
+            )}
           </div>
 
           <div className="grid sm:grid-cols-3 gap-6 pt-20">
