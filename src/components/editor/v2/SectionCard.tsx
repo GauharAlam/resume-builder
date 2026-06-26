@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import React, { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 interface SectionCardProps {
   title: string;
@@ -7,38 +7,67 @@ interface SectionCardProps {
   defaultOpen?: boolean;
 }
 
-const SectionCard: React.FC<SectionCardProps> = ({ title, children, defaultOpen = true }) => {
+const SectionCard: React.FC<SectionCardProps> = ({
+  title,
+  children,
+  defaultOpen = true,
+}) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   React.useEffect(() => {
     const handleOpen = (e: CustomEvent | Event) => {
-      if ('detail' in e && e.detail === title) {
+      if ("detail" in e && e.detail === title) {
         setIsOpen(true);
       }
     };
-    window.addEventListener('open-section', handleOpen);
-    return () => window.removeEventListener('open-section', handleOpen);
+    window.addEventListener("open-section", handleOpen);
+    return () => window.removeEventListener("open-section", handleOpen);
   }, [title]);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all duration-200">
-      <div 
-        className="w-full flex justify-between items-center p-6 cursor-pointer hover:bg-gray-50 bg-white select-none transition-colors"
+    <div
+      className="rounded-xl overflow-hidden transition-all duration-200"
+      style={{
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.09)",
+      }}
+    >
+      {/* Header / toggle */}
+      <button
+        type="button"
+        className="w-full flex justify-between items-center px-5 py-4 cursor-pointer select-none transition-colors"
+        style={{ background: "transparent" }}
         onClick={() => setIsOpen(!isOpen)}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = "rgba(255,255,255,0.04)")
+        }
+        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        {isOpen ? (
-          <ChevronUp className="text-gray-400" size={20} />
-        ) : (
-          <ChevronDown className="text-gray-400" size={20} />
-        )}
-      </div>
-      
-      {isOpen && (
-        <div className="px-6 pb-6 pt-2 space-y-4 border-t border-gray-100 bg-white">
+        <h3
+          className="text-sm font-semibold tracking-wide"
+          style={{ color: "#F0FDF4" }}
+        >
+          {title}
+        </h3>
+        <ChevronDown
+          size={16}
+          className="transition-transform duration-300 flex-shrink-0"
+          style={{
+            color: "rgba(209,250,229,0.45)",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        />
+      </button>
+
+      {/* Animated body — grid-template-rows trick for height: auto animation */}
+      <div className={`section-body${isOpen ? " open" : ""}`}>
+        <div
+          className="section-body-inner px-5 pb-5 pt-1 space-y-4"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        >
           {children}
         </div>
-      )}
+      </div>
     </div>
   );
 };

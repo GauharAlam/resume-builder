@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Globe, X, Share2, ExternalLink } from 'lucide-react';
-import { useResume } from '@/hooks';
-import { trackEvent } from '@/services/analytics';
+import React, { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { Copy, Check, Globe, X, Share2, ExternalLink } from "lucide-react";
+import { useResume } from "@/hooks";
+import { trackEvent } from "@/services/analytics";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
     try {
       await toggleSharing(!isPublic);
     } catch (error) {
-      console.error('Failed to toggle sharing:', error);
+      console.error("Failed to toggle sharing:", error);
     } finally {
       setIsUpdating(false);
     }
@@ -33,97 +33,217 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(publicUrl);
     setIsCopied(true);
-    if (resumeData.shareId) {
-      trackEvent('resume_share_link_copied', { shareId: resumeData.shareId });
-    }
+    if (resumeData.shareId)
+      trackEvent("resume_share_link_copied", { shareId: resumeData.shareId });
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
-              <Share2 size={20} />
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+      }}
+    >
+      <div
+        className="modal-enter w-full max-w-md overflow-hidden"
+        style={{
+          background: "rgba(10,17,14,0.96)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255,255,255,0.11)",
+          borderRadius: "1rem",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.60)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="p-5 flex justify-between items-center"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="p-2 rounded-lg"
+              style={{
+                background: "rgba(74,222,128,0.12)",
+                border: "1px solid rgba(74,222,128,0.25)",
+              }}
+            >
+              <Share2 size={18} style={{ color: "#4ade80" }} />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Share Resume</h2>
+            <h2 className="text-lg font-bold" style={{ color: "#F0FDF4" }}>
+              Share Resume
+            </h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <X size={20} />
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: "rgba(209,250,229,0.45)" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.color = "#F0FDF4";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "rgba(209,250,229,0.45)";
+            }}
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Toggle Section */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+        <div className="p-5 space-y-5">
+          {/* Toggle */}
+          <div
+            className="flex items-center justify-between p-4 rounded-xl"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.09)",
+            }}
+          >
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${isPublic ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-500'}`}>
-                <Globe size={18} />
+              <div
+                className="p-2 rounded-lg"
+                style={{
+                  background: isPublic
+                    ? "rgba(74,222,128,0.15)"
+                    : "rgba(255,255,255,0.07)",
+                  border: `1px solid ${isPublic ? "rgba(74,222,128,0.25)" : "rgba(255,255,255,0.10)"}`,
+                }}
+              >
+                <Globe
+                  size={16}
+                  style={{
+                    color: isPublic ? "#4ade80" : "rgba(209,250,229,0.45)",
+                  }}
+                />
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-900">Public Access</p>
-                <p className="text-xs text-gray-500">{isPublic ? 'Anyone with the link can view' : 'Only you can view this resume'}</p>
+                <p className="text-sm font-bold" style={{ color: "#F0FDF4" }}>
+                  Public Access
+                </p>
+                <p
+                  className="text-xs"
+                  style={{ color: "rgba(209,250,229,0.45)" }}
+                >
+                  {isPublic
+                    ? "Anyone with the link can view"
+                    : "Only you can view this resume"}
+                </p>
               </div>
             </div>
             <button
               onClick={handleTogglePublic}
               disabled={isUpdating}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isPublic ? 'bg-emerald-600' : 'bg-gray-300'} ${isUpdating ? 'opacity-50' : ''}`}
+              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50"
+              style={{
+                background: isPublic ? "#4ade80" : "rgba(255,255,255,0.15)",
+              }}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+              <span
+                className="inline-block h-4 w-4 transform rounded-full transition-transform"
+                style={{
+                  background: isPublic ? "#052e16" : "#F0FDF4",
+                  transform: isPublic ? "translateX(24px)" : "translateX(4px)",
+                }}
+              />
             </button>
           </div>
 
           {isPublic && (
-            <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
-              {/* Link Section */}
+            <div className="space-y-5">
+              {/* Link */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Public Link</label>
+                <label
+                  className="text-xs font-bold uppercase tracking-wider ml-1"
+                  style={{ color: "rgba(209,250,229,0.42)" }}
+                >
+                  Public Link
+                </label>
                 <div className="flex gap-2">
-                  <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 font-medium truncate">
+                  <div
+                    className="flex-1 px-3 py-2.5 text-sm rounded-xl truncate"
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.09)",
+                      color: "rgba(209,250,229,0.65)",
+                    }}
+                  >
                     {publicUrl}
                   </div>
                   <button
                     onClick={copyToClipboard}
-                    className="flex items-center justify-center p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 hover:shadow-sm transition-all"
+                    className="p-2.5 rounded-xl transition-all"
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      color: isCopied ? "#4ade80" : "rgba(209,250,229,0.65)",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background =
+                        "rgba(255,255,255,0.11)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background =
+                        "rgba(255,255,255,0.06)")
+                    }
                     title="Copy to clipboard"
                   >
-                    {isCopied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
+                    {isCopied ? <Check size={16} /> : <Copy size={16} />}
                   </button>
                 </div>
               </div>
 
-              {/* QR Code Section */}
-              <div className="flex flex-col items-center gap-4 py-4">
-                <div className="p-4 bg-white border-2 border-dashed border-gray-200 rounded-2xl shadow-sm">
-                  <QRCodeSVG value={publicUrl} size={160} level="H" includeMargin={true} />
+              {/* QR Code — white bg intentional for scannability */}
+              <div className="flex flex-col items-center gap-3 py-2">
+                <div
+                  className="p-4 rounded-2xl"
+                  style={{
+                    background: "#fff",
+                    border: "2px dashed rgba(255,255,255,0.15)",
+                  }}
+                >
+                  <QRCodeSVG
+                    value={publicUrl}
+                    size={148}
+                    level="H"
+                    includeMargin={true}
+                  />
                 </div>
-                <p className="text-xs text-gray-400 font-medium italic text-center px-8">
+                <p
+                  className="text-xs text-center px-6 italic"
+                  style={{ color: "rgba(209,250,229,0.38)" }}
+                >
                   Scannable QR code for business cards and prints.
                 </p>
               </div>
 
-              <div className="pt-2">
-                <a
-                  href={publicUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors shadow-lg"
-                >
-                  <ExternalLink size={16} />
-                  Open Live Preview
-                </a>
-              </div>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+              >
+                <ExternalLink size={15} />
+                Open Live Preview
+              </a>
             </div>
           )}
 
           {!isPublic && (
             <div className="py-8 text-center space-y-3">
-              <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
-                <Share2 size={24} />
+              <div
+                className="mx-auto w-12 h-12 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              >
+                <Share2 size={22} style={{ color: "rgba(209,250,229,0.35)" }} />
               </div>
-              <p className="text-sm text-gray-500 px-8">
+              <p
+                className="text-sm px-6"
+                style={{ color: "rgba(209,250,229,0.50)" }}
+              >
                 To share your resume with the world, enable public access above.
               </p>
             </div>

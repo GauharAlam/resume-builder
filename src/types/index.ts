@@ -44,21 +44,27 @@ export interface Accomplishment {
   description: string;
 }
 
-export type SectionId = 'summary' | 'experience' | 'projects' | 'education' | 'skills' | 'accomplishments';
+export type SectionId =
+  | "summary"
+  | "experience"
+  | "projects"
+  | "education"
+  | "skills"
+  | "accomplishments";
 
-export type FontFamily = 
-  | 'inter' 
-  | 'roboto' 
-  | 'playfair' 
-  | 'merriweather' 
-  | 'fira-code' 
-  | 'monaco' 
-  | 'sans' 
-  | 'serif' 
-  | 'mono';
+export type FontFamily =
+  | "inter"
+  | "roboto"
+  | "playfair"
+  | "merriweather"
+  | "fira-code"
+  | "monaco"
+  | "sans"
+  | "serif"
+  | "mono";
 
-export type FontSize = 'small' | 'medium' | 'large';
-export type LayoutSpacing = 'compact' | 'standard' | 'spacious';
+export type FontSize = "small" | "medium" | "large";
+export type LayoutSpacing = "compact" | "standard" | "spacious";
 
 export interface TemplateCustomization {
   fontFamily: FontFamily;
@@ -89,12 +95,22 @@ export interface ATSAnalysisResult {
   suggestions: string[];
 }
 
+export interface JDMatchResult {
+  matchScore: number;
+  verdict: string;
+  missingSkills: string[];
+  suggestions: string[];
+}
 
-export type TemplateID = 'professional-it' | 'ats-modern' | 'standard-classic' | 'tech-minimalist';
+export type TemplateID =
+  | "professional-it"
+  | "ats-modern"
+  | "standard-classic"
+  | "tech-minimalist";
 
-export type SaveStatus = 'saving' | 'saved' | 'error';
+export type SaveStatus = "saving" | "saved" | "error";
 
 export interface ChatMessage {
-  sender: 'user' | 'bot';
+  sender: "user" | "bot";
   text: string;
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Check, RotateCcw, Edit3 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { X, Check, RotateCcw, Edit3 } from "lucide-react";
 
 interface AIImproveModalProps {
   isOpen: boolean;
@@ -16,10 +16,10 @@ const AIImproveModal: React.FC<AIImproveModalProps> = ({
   oldText,
   newText: initialNewText,
   onAccept,
-  section
+  section,
 }) => {
   const [editableNewText, setEditableNewText] = useState(initialNewText);
-  const [activeTab, setActiveTab] = useState<'compare' | 'edit'>('compare');
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     setEditableNewText(initialNewText);
@@ -28,22 +28,69 @@ const AIImproveModal: React.FC<AIImproveModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+    /* Backdrop */
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+      }}
+    >
+      {/* Modal */}
+      <div
+        className="modal-enter w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]"
+        style={{
+          background: "rgba(10,17,14,0.96)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255,255,255,0.11)",
+          borderRadius: "1rem",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.60)",
+        }}
+      >
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b bg-gray-50">
+        <div
+          className="flex justify-between items-center p-6"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            borderBottom: "1px solid rgba(255,255,255,0.07)",
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
-              <Edit3 size={20} />
+            <div
+              className="p-2 rounded-lg"
+              style={{
+                background: "rgba(74,222,128,0.15)",
+                border: "1px solid rgba(74,222,128,0.25)",
+              }}
+            >
+              <Edit3 size={18} style={{ color: "#4ade80" }} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Review AI Improvement</h2>
-              <p className="text-sm text-gray-500">Refining your {section} description</p>
+              <h2 className="text-lg font-bold" style={{ color: "#F0FDF4" }}>
+                Review AI Improvement
+              </h2>
+              <p
+                className="text-sm"
+                style={{ color: "rgba(209,250,229,0.55)" }}
+              >
+                Refining your {section} description
+              </p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+            className="p-2 rounded-full transition-colors"
+            style={{ color: "rgba(209,250,229,0.45)" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.color = "#F0FDF4";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "rgba(209,250,229,0.45)";
+            }}
           >
             <X size={20} />
           </button>
@@ -55,60 +102,124 @@ const AIImproveModal: React.FC<AIImproveModalProps> = ({
             {/* Original */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Original Text</span>
-                <button 
-                  onClick={() => setEditableNewText(oldText)}
-                  className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                <span
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: "rgba(209,250,229,0.40)" }}
                 >
-                  <RotateCcw size={12} /> Reset to original
+                  Original Text
+                </span>
+                <button
+                  onClick={() => setEditableNewText(oldText)}
+                  className="text-xs flex items-center gap-1 transition-colors"
+                  style={{ color: "#4ade80" }}
+                >
+                  <RotateCcw size={11} /> Reset to original
                 </button>
               </div>
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 h-[250px] overflow-y-auto italic">
+              <div
+                className="p-4 rounded-xl text-sm h-[250px] overflow-y-auto italic"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "rgba(209,250,229,0.65)",
+                }}
+              >
                 {oldText || "No original text found."}
               </div>
             </div>
 
-            {/* AI Improved */}
+            {/* AI Suggestion */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-500">AI Suggestion (Editable)</span>
-              </div>
+              <span
+                className="text-xs font-bold uppercase tracking-wider"
+                style={{ color: "#4ade80" }}
+              >
+                AI Suggestion (Editable)
+              </span>
               <textarea
                 value={editableNewText}
                 onChange={(e) => setEditableNewText(e.target.value)}
-                className="w-full p-4 bg-emerald-50/30 border border-emerald-200 rounded-xl text-sm text-gray-800 h-[250px] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none transition-all"
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                className="w-full h-[250px] text-sm resize-none rounded-xl p-4 outline-none transition-all"
+                style={{
+                  background: "rgba(74,222,128,0.06)",
+                  border: focused
+                    ? "1px solid rgba(74,222,128,0.52)"
+                    : "1px solid rgba(74,222,128,0.20)",
+                  boxShadow: focused
+                    ? "0 0 0 3px rgba(74,222,128,0.10)"
+                    : "none",
+                  color: "#F0FDF4",
+                }}
                 placeholder="AI response will appear here..."
               />
             </div>
           </div>
 
-          <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex gap-3 items-start">
-            <div className="text-blue-500 mt-0.5">💡</div>
-            <p className="text-xs text-blue-700 leading-relaxed">
-              <strong>Pro Tip:</strong> You can edit the AI suggestion directly in the box above before accepting it. Make sure to include specific metrics and action verbs for the best results.
+          {/* Pro tip */}
+          <div
+            className="p-4 rounded-xl flex gap-3 items-start"
+            style={{
+              background: "rgba(96,165,250,0.08)",
+              border: "1px solid rgba(96,165,250,0.18)",
+            }}
+          >
+            <div style={{ color: "#60a5fa", marginTop: "2px" }}>💡</div>
+            <p
+              className="text-xs leading-relaxed"
+              style={{ color: "rgba(209,250,229,0.70)" }}
+            >
+              <strong style={{ color: "#F0FDF4" }}>Pro Tip:</strong> You can
+              edit the AI suggestion directly before accepting it. Include
+              specific metrics and action verbs for best results.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+        <div
+          className="p-6 flex justify-end gap-3"
+          style={{
+            borderTop: "1px solid rgba(255,255,255,0.07)",
+            background: "rgba(255,255,255,0.03)",
+          }}
+        >
           <button
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-xl transition-all"
+            className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all"
+            style={{ color: "rgba(209,250,229,0.65)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "rgba(255,255,255,0.07)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "transparent")
+            }
           >
             Discard
           </button>
           <button
             onClick={() => onAccept(oldText)}
-            className="px-6 py-2.5 text-sm font-semibold text-indigo-600 border border-indigo-200 hover:bg-indigo-50 rounded-xl transition-all"
+            className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all"
+            style={{
+              color: "rgba(209,250,229,0.75)",
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "rgba(255,255,255,0.12)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "rgba(255,255,255,0.07)")
+            }
           >
             Keep Original
           </button>
           <button
             onClick={() => onAccept(editableNewText)}
-            className="px-8 py-2.5 text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center gap-2"
+            className="btn-primary px-7 py-2.5 text-sm rounded-xl flex items-center gap-2"
           >
-            <Check size={18} /> Apply Improvement
+            <Check size={16} /> Apply Improvement
           </button>
         </div>
       </div>

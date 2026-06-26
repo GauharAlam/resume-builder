@@ -1,53 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Resume Builder - ATS-Friendly Resumes for Indian IT Professionals</title>
-    <meta name="description" content="Build premium, ATS-friendly resumes tailored for the Indian IT sector. AI-powered writing, modern templates, and one-click PDF export." />
-    <meta name="keywords" content="Resume Builder, AI Resume, ATS Friendly, Indian IT Sector, Software Engineer Resume, Tech Resume, Free Resume Maker" />
-    <meta name="theme-color" content="#4f46e5" />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="AI Resume Builder - Pro Templates for Tech" />
-    <meta property="og:description" content="Land your dream job with resumes designed for modern tech companies. Fast, AI-powered, and professional." />
-    <meta property="og:url" content="https://airesume.yourdomain.com" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="AI Resume Builder" />
-    <meta name="twitter:description" content="Stand out in the Indian IT market with our AI-powered resume builder." />
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" />
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Merriweather:wght@400;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>
+            AI Resume Builder - ATS-Friendly Resumes for Indian IT Professionals
+        </title>
+        <meta
+            name="description"
+            content="Build premium, ATS-friendly resumes tailored for the Indian IT sector. AI-powered writing, modern templates, and one-click PDF export."
+        />
+        <meta
+            name="keywords"
+            content="Resume Builder, AI Resume, ATS Friendly, Indian IT Sector, Software Engineer Resume, Tech Resume, Free Resume Maker"
+        />
+        <meta name="theme-color" content="#4f46e5" />
+        <meta property="og:type" content="website" />
+        <meta
+            property="og:title"
+            content="AI Resume Builder - Pro Templates for Tech"
+        />
+        <meta
+            property="og:description"
+            content="Land your dream job with resumes designed for modern tech companies. Fast, AI-powered, and professional."
+        />
+        <meta property="og:url" content="https://airesume.yourdomain.com" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="AI Resume Builder" />
+        <meta
+            name="twitter:description"
+            content="Stand out in the Indian IT market with our AI-powered resume builder."
+        />
 
-    <style>
-      :root {
-        --font-inter: 'Inter', sans-serif;
-        --font-roboto: 'Roboto', sans-serif;
-        --font-playfair: 'Playfair Display', serif;
-        --font-merriweather: 'Merriweather', serif;
-        --font-fira-code: 'Fira Code', monospace;
-      }
-      
-      .font-inter { font-family: var(--font-inter); }
-      .font-roboto { font-family: var(--font-roboto); }
-      .font-playfair { font-family: var(--font-playfair); }
-      .font-merriweather { font-family: var(--font-merriweather); }
-      .font-fira-code { font-family: var(--font-fira-code); }
-    </style>
-    
+        <script src="https://cdn.tailwindcss.com"></script>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
+
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css"
+        />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Merriweather:wght@400;700&family=Fira+Code:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+
+        <style>
+            :root {
+                --font-inter: "Inter", sans-serif;
+                --font-roboto: "Roboto", sans-serif;
+                --font-playfair: "Playfair Display", serif;
+                --font-merriweather: "Merriweather", serif;
+                --font-fira-code: "Fira Code", monospace;
+            }
+
+            .font-inter {
+                font-family: var(--font-inter);
+            }
+            .font-roboto {
+                font-family: var(--font-roboto);
+            }
+            .font-playfair {
+                font-family: var(--font-playfair);
+            }
+            .font-merriweather {
+                font-family: var(--font-merriweather);
+            }
+            .font-fira-code {
+                font-family: var(--font-fira-code);
+            }
+        </style>
     </head>
-  <body class="bg-gray-100">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    <body style="background: #0d1512; margin: 0">
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
 </html>
