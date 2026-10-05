@@ -3,7 +3,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { AuthProvider, ThemeProvider } from "./context";
 import { ResumeProvider } from "./hooks";
-import { HomePage, EditorPage, PublicResumePage } from "./features/resume";
+import { LandingPage, EditorPage, PublicResumePage } from "./features/resume";
 import { LoginPage, RegisterPage, ProtectedRoute } from "./features/auth";
 import { ResumeHistory } from "./components/editor";
 import { ToastHost } from "./components/common";
@@ -138,7 +138,7 @@ const App: React.FC = () => {
             <div className="min-h-screen">
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/login/*" element={<LoginPage />} />
                 <Route path="/register/*" element={<RegisterPage />} />
                 <Route path="/view/:shareId" element={<PublicResumePage />} />
