@@ -28,7 +28,7 @@ import { useAuth } from "@/context";
 
 const BLUE = "#1456F0";
 const PAGE_BG = "#FAFAFA";
-const SERIF = '"Instrument Serif", "Playfair Display", Georgia, serif';
+const SERIF = '"Source Serif 4", "Merriweather", Georgia, serif';
 const RESUME_SERIF = '"Source Serif 4", "Merriweather", Georgia, serif';
 
 const NAV_LINKS = [
@@ -170,8 +170,8 @@ const LandingPage: React.FC = () => {
             style={{
               animationDelay: "120ms",
               fontFamily: SERIF,
-              fontSize: "clamp(2.6rem, 4.6vw, 3.9rem)",
-              letterSpacing: "-0.035em",
+              fontSize: "clamp(2.3rem, 3.9vw, 3.35rem)",
+              letterSpacing: "-0.055em",
             }}
           >
             <span className="text-[#757575]">Stop struggling with Resumes.</span>
@@ -208,7 +208,7 @@ const LandingPage: React.FC = () => {
           </div>
 
           <div
-            className="animate-fade-rise mt-24 flex flex-col gap-5 text-[0.95rem] text-[#6B6B6B] sm:flex-row sm:items-center sm:gap-7"
+            className="animate-fade-rise mt-12 flex flex-col gap-5 lg:mt-24 text-[0.95rem] text-[#6B6B6B] sm:flex-row sm:items-center sm:gap-7"
             style={{ animationDelay: "480ms" }}
           >
             <div className="flex items-center gap-3">
@@ -326,7 +326,7 @@ const LandingPage: React.FC = () => {
               style={{ transitionDelay: `${i * 90}ms` }}
             >
               <div className="flex items-start justify-between gap-3">
-                <h3 className="text-[1.5rem] leading-tight" style={{ fontFamily: SERIF }}>
+                <h3 className="text-[1.4rem] leading-tight tracking-[-0.04em]" style={{ fontFamily: SERIF }}>
                   {starter.title}
                 </h3>
                 <span className="mt-1 shrink-0 rounded-md bg-[#F1F1F1] px-2 py-1 text-xs text-[#4A4A4A]">
@@ -368,7 +368,7 @@ const LandingPage: React.FC = () => {
         <div className="reveal rounded-3xl bg-[#111111] px-6 py-16 text-center text-white sm:py-20">
           <h2
             className="leading-[1.1]"
-            style={{ fontFamily: SERIF, fontSize: "clamp(2.1rem, 4vw, 3.2rem)", letterSpacing: "-0.03em" }}
+            style={{ fontFamily: SERIF, fontSize: "clamp(1.9rem, 3.4vw, 2.8rem)", letterSpacing: "-0.05em" }}
           >
             <span className="text-[#9A9A9A]">Your next role starts with</span>
             <br />a better resume.
@@ -422,7 +422,7 @@ const SectionHeading = ({
     </span>
     <h2
       className="mt-4 leading-[1.1]"
-      style={{ fontFamily: SERIF, fontSize: "clamp(2rem, 3.4vw, 2.9rem)", letterSpacing: "-0.03em" }}
+      style={{ fontFamily: SERIF, fontSize: "clamp(1.8rem, 3vw, 2.5rem)", letterSpacing: "-0.05em" }}
     >
       {title}
     </h2>
@@ -544,7 +544,7 @@ const HeroPreview: React.FC = () => (
 
       {/* Summary */}
       <p
-        className="mt-9 bg-gradient-to-r from-[#FAFAFA] via-white to-[#FAFAFA] px-4 py-2.5 text-[12.5px] leading-[1.4] text-[#2B2B2B]"
+        className="mt-9 bg-gradient-to-r from-[#FAFAFA] via-white to-[#FAFAFA] py-2.5 pl-4 pr-20 text-[12.5px] leading-[1.4] text-[#2B2B2B]"
         style={{ fontFamily: RESUME_SERIF }}
       >
         A passionate user experience engineer committed to creating intuitive
