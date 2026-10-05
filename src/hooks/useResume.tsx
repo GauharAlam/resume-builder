@@ -260,7 +260,7 @@ interface ResumeContextType {
     activeResumeId: string | null;
     isLoading: boolean;
     loadResume: (resumeId: string) => void;
-    createNewResume: () => void;
+    createNewResume: () => Promise<string | null>;
     deleteResume: (resumeId: string) => Promise<void>;
     updateResumeTitle: (newTitle: string) => void;
     currentTitle: string;

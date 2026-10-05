@@ -1,802 +1,560 @@
-import { useResume } from "@/hooks";
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
-  Pencil,
   Trash2,
   Download,
   Eye,
   FileText,
   Clock,
   Search,
-  Filter,
-  ChevronDown,
   Briefcase,
   ArrowLeft,
+  X,
+  Loader2,
+  Pencil,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import ResumePreview from "./ResumePreview";
+import { Link, useNavigate } from "react-router-dom";
+import { useResume } from "@/hooks";
+import { ResumeData, TemplateID } from "@/types";
+import { ResumeTemplate } from "@/components/templates";
+import { toastError, toastSuccess } from "@/utils/toast";
+import { trackEvent } from "@/services/analytics";
+import { exportElementToPdf, isPdfLibraryLoaded } from "@/utils/pdfExport";
+import { PrimaryButton, SecondaryButton, SelectField, cx } from "./v3/ui";
 
-/* ─── Colour tokens (match design system) ───────────────────── */
-const C = {
-  base: "#0D1512",
-  textPrimary: "#F0FDF4",
-  textSecondary: "rgba(209,250,229,0.65)",
-  textMuted: "rgba(209,250,229,0.42)",
-  green: "#4ade80",
-  greenMuted: "rgba(74,222,128,0.12)",
-  greenBorder: "rgba(74,222,128,0.25)",
-  mint: "#bbf7d0",
-  divider: "rgba(255,255,255,0.07)",
-  surfaceBorder: "rgba(255,255,255,0.09)",
-} as const;
-
+type SavedResume = ReturnType<typeof useResume>["resumeHistory"][number];
 type SortOption = "recent" | "oldest" | "name-asc" | "name-desc";
+
+const PAGE_BG = "#F3F4F6";
+const PAGE_WIDTH = 794;
+const PAGE_SIZE = 6;
+const VALID_TEMPLATES: TemplateID[] = ["professional-it", "ats-modern", "standard-classic", "tech-minimalist", "clean-serif"];
+
+// React 18 doesn't type `inert`; it keeps decorative thumbnails (which contain
+// links) out of the tab order.
+const inertProps = { inert: "" } as Record<string, string>;
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+const formatDate = (value?: string) => {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    : "—";
+};
+
+/** Saved data can predate newer fields; fill gaps so a template never crashes on it. */
+const toRenderable = (resume: SavedResume): { data: ResumeData; template: TemplateID } => {
+  const raw = (resume.resumeData || {}) as Partial<ResumeData> & { template?: TemplateID };
+  const details = raw.personalDetails;
+  const data: ResumeData = {
+    personalDetails: {
+      fullName: details?.fullName || "",
+      jobTitle: details?.jobTitle || "",
+      email: details?.email || "",
+      phone: details?.phone || "",
+      location: details?.location || "",
+      links: details?.links || [],
+      photo: details?.photo,
+    },
+    summary: raw.summary || "",
+    experience: raw.experience || [],
+    education: raw.education || [],
+    skills: raw.skills || "",
+    projects: raw.projects || [],
+    accomplishments: raw.accomplishments || [],
+    sectionOrder: raw.sectionOrder || ["summary", "experience", "projects", "education", "skills", "accomplishments"],
+    accentColor: raw.accentColor || "#4F46E5",
+    customization: { fontFamily: "sans", fontSize: "medium", layout: "standard", ...(raw.customization || {}) },
+  };
+  const template = raw.template && VALID_TEMPLATES.includes(raw.template) ? raw.template : "professional-it";
+  return { data, template };
+};
+
+/** One malformed resume must not take the whole dashboard down. */
+type BoundaryProps = { children: React.ReactNode; fallback: React.ReactNode };
+
+class RenderBoundary extends React.Component<BoundaryProps, { failed: boolean }> {
+  // @types/react isn't installed here, so spell out what the base class provides
+  declare props: Readonly<BoundaryProps>;
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("Resume preview failed to render:", error);
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+const ThumbnailFallback: React.FC = () => (
+  <div className="flex h-full w-full items-center justify-center bg-[#F6F7F9] text-[#9AA0AB]">
+    <FileText size={32} />
+  </div>
+);
+
+/** The real template, scaled down to the card's width. */
+const ResumeThumbnail: React.FC<{ resume: SavedResume }> = ({ resume }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(0.4);
+  const { data, template } = useMemo(() => toRenderable(resume), [resume]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setZoom(entry.contentRect.width / PAGE_WIDTH));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="relative h-[230px] overflow-hidden bg-white" aria-hidden="true" {...inertProps}>
+      <RenderBoundary fallback={<ThumbnailFallback />}>
+        <div className="pointer-events-none select-none" style={{ width: PAGE_WIDTH, zoom }}>
+          <ResumeTemplate template={template} data={data} />
+        </div>
+      </RenderBoundary>
+    </div>
+  );
+};
+
+const IconAction: React.FC<{
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}> = ({ label, onClick, disabled, danger, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+    title={label}
+    className={cx(
+      "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E3E5EA] bg-white text-[#3F4551] transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+      danger ? "hover:border-[#F5C2C2] hover:bg-[#FEECEC] hover:text-[#DC2626]" : "hover:bg-[#F0F1F4]",
+    )}
+  >
+    {children}
+  </button>
+);
+
+/* ── Full-size preview ─────────────────────────────────────── */
+
+const PreviewModal: React.FC<{
+  resume: SavedResume;
+  downloading: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onDownload: () => void;
+}> = ({ resume, downloading, onClose, onEdit, onDownload }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const { data, template } = useMemo(() => toRenderable(resume), [resume]);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setZoom(Math.min(1, Math.max(0.3, (entry.contentRect.width - 32) / PAGE_WIDTH))));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1220]/50 p-3 sm:p-6" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Preview of ${resume.title || "resume"}`}
+        className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_80px_rgba(16,24,40,0.3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-[#E9EAEE] px-5 py-3.5">
+          <h2 className="min-w-0 truncate text-[17px] font-medium text-[#14161A]">{resume.title || "Untitled Resume"}</h2>
+          <div className="flex shrink-0 items-center gap-2">
+            <SecondaryButton onClick={onDownload} disabled={downloading} className="!px-3 !py-2">
+              {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              <span className="hidden sm:inline">{downloading ? "Exporting…" : "PDF"}</span>
+            </SecondaryButton>
+            <PrimaryButton onClick={onEdit} className="!px-4 !py-2">
+              <Pencil size={14} />
+              Edit
+            </PrimaryButton>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close preview"
+              className="rounded-lg p-2 text-[#6B7280] hover:bg-[#F0F1F4] hover:text-[#14161A]"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto bg-[#F3F4F6] p-4">
+          <RenderBoundary fallback={<p className="py-16 text-center text-sm text-[#6B7280]">This resume can't be previewed. Open it in the editor instead.</p>}>
+            <div className="mx-auto w-fit bg-white shadow-[0_2px_24px_rgba(16,24,40,0.08)]" style={{ zoom }}>
+              <div style={{ width: PAGE_WIDTH }}>
+                <ResumeTemplate template={template} data={data} />
+              </div>
+            </div>
+          </RenderBoundary>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ── Page ──────────────────────────────────────────────────── */
 
 const ResumeHistory: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    resumeHistory,
-    activeResumeId,
-    loadResume,
-    createNewResume,
-    deleteResume,
-    isLoading,
-    updateResumeTitle,
-    currentTitle,
-  } = useResume();
+  const { resumeHistory, activeResumeId, createNewResume, deleteResume, isLoading } = useResume();
 
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editingTitleValue, setEditingTitleValue] = useState(currentTitle);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("recent");
-  const [itemsToShow, setItemsToShow] = useState(6);
-  const [showSortMenu, setShowSortMenu] = useState(false);
-  const [previewingResumeId, setPreviewingResumeId] = useState<string | null>(
-    null,
-  );
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState<string | null>(null);
-  const [shareToast, setShareToast] = useState<string | null>(null);
+  const [itemsToShow, setItemsToShow] = useState(PAGE_SIZE);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
-  /* ── title editing ── */
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setEditingTitleValue(e.target.value);
+  // index.html paints the body dark for the rest of the app
+  useEffect(() => {
+    const previous = document.body.style.background;
+    document.body.style.background = PAGE_BG;
+    return () => {
+      document.body.style.background = previous;
+    };
+  }, []);
 
-  const handleTitleSave = () => {
-    updateResumeTitle(editingTitleValue || "Untitled Resume");
-    setIsEditingTitle(false);
-  };
+  useEffect(() => setItemsToShow(PAGE_SIZE), [searchTerm, sortBy]);
 
-  const handleTitleBlur = () => handleTitleSave();
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleTitleSave();
-    else if (e.key === "Escape") {
-      setEditingTitleValue(currentTitle);
-      setIsEditingTitle(false);
-    }
-  };
-
-  React.useEffect(() => {
-    setEditingTitleValue(currentTitle);
-  }, [currentTitle]);
-
-  /* ── actions ── */
-  const handleDeleteResume = async (resumeId: string) => {
-    await deleteResume(resumeId);
-    setDeleteConfirm(null);
-  };
-
-  const handleEditResume = (resumeId: string) => {
-    loadResume(resumeId);
-    navigate(`/edit-resume/${resumeId}`);
-  };
-
-  const handlePreviewResume = (resumeId: string) => {
-    loadResume(resumeId);
-    setPreviewingResumeId(resumeId);
-  };
-
-  const handleShareResume = async (resumeId: string, resumeTitle: string) => {
-    try {
-      const shareData = {
-        title: resumeTitle || "My Resume",
-        text: `Check out my resume: ${resumeTitle || "My Resume"}`,
-        url: window.location.href,
-      };
-      if (navigator.share) await navigator.share(shareData);
-      else {
-        await navigator.clipboard.writeText(
-          `${shareData.title} - ${shareData.url}`,
-        );
-        setShareToast(resumeId);
-        setTimeout(() => setShareToast(null), 3000);
-      }
-    } catch (err) {
-      console.error("Error sharing resume:", err);
-    }
-  };
-
-  const handleCreateNewResume = async () => {
-    const newResumeId = await createNewResume();
-    navigate(`/edit-resume/${newResumeId}`);
-  };
-
-  const handleDownloadPdf = async (resumeId: string) => {
-    setIsDownloadingPdf(resumeId);
-    try {
-      const resumeToDownload = resumeHistory.find((r) => r._id === resumeId);
-      if (!resumeToDownload) return setIsDownloadingPdf(null);
-
-      loadResume(resumeId);
-      setTimeout(async () => {
-        const el = document.getElementById("resume-preview");
-        if (!el) return setIsDownloadingPdf(null);
-        try {
-          const { jsPDF } = window.jspdf;
-          const canvas = await window.html2canvas(el, {
-            scale: 2,
-            useCORS: true,
-          });
-          const imgData = canvas.toDataURL("image/png");
-          const pdf = new jsPDF({
-            orientation: "portrait",
-            unit: "mm",
-            format: "a4",
-          });
-          const pdfW = pdf.internal.pageSize.getWidth();
-          const pdfH = pdf.internal.pageSize.getHeight();
-          const imgProps = pdf.getImageProperties(imgData);
-          const ratio = Math.min(pdfW / imgProps.width, pdfH / imgProps.height);
-          const sW = imgProps.width * ratio;
-          const sH = imgProps.height * ratio;
-          pdf.addImage(imgData, "PNG", (pdfW - sW) / 2, 0, sW, sH);
-          pdf.save(`${resumeToDownload.title || "resume"}.pdf`);
-        } catch (err) {
-          console.error("Error generating PDF:", err);
-        } finally {
-          setIsDownloadingPdf(null);
-        }
-      }, 500);
-    } catch (err) {
-      console.error("Error downloading resume:", err);
-      setIsDownloadingPdf(null);
-    }
-  };
-
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-
-  /* ── filter + sort ── */
   const filteredAndSorted = useMemo(() => {
-    let filtered = resumeHistory.filter(
+    const term = searchTerm.trim().toLowerCase();
+    const matches = (value?: string) => (value || "").toLowerCase().includes(term);
+    const list = resumeHistory.filter(
       (r) =>
-        (r.title || "Untitled Resume")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (r.resumeData?.personalDetails?.fullName || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (r.resumeData?.personalDetails?.jobTitle || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()),
+        !term ||
+        matches(r.title || "Untitled Resume") ||
+        matches(r.resumeData?.personalDetails?.fullName) ||
+        matches(r.resumeData?.personalDetails?.jobTitle),
     );
-    filtered.sort((a, b) => {
+    const time = (r: SavedResume) => new Date(r.updatedAt).getTime() || 0;
+    return list.sort((a, b) => {
       switch (sortBy) {
-        case "recent":
-          return (
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-          );
         case "oldest":
-          return (
-            new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-          );
+          return time(a) - time(b);
         case "name-asc":
           return (a.title || "").localeCompare(b.title || "");
         case "name-desc":
           return (b.title || "").localeCompare(a.title || "");
         default:
-          return 0;
+          return time(b) - time(a);
       }
     });
-    return filtered;
   }, [resumeHistory, searchTerm, sortBy]);
 
-  const displayedResumes = filteredAndSorted.slice(0, itemsToShow);
-  const hasMore = displayedResumes.length < filteredAndSorted.length;
+  const displayed = filteredAndSorted.slice(0, itemsToShow);
+  const hasMore = displayed.length < filteredAndSorted.length;
+  const previewing = previewId ? resumeHistory.find((r) => r._id === previewId) : undefined;
+  const exporting = exportingId ? resumeHistory.find((r) => r._id === exportingId) : undefined;
 
-  /* ── sort label helper ── */
-  const sortLabels: Record<SortOption, string> = {
-    recent: "Most Recent",
-    oldest: "Oldest",
-    "name-asc": "Title (A–Z)",
-    "name-desc": "Title (Z–A)",
+  // Close the preview if its resume is deleted from under it
+  useEffect(() => {
+    if (previewId && !previewing) setPreviewId(null);
+  }, [previewId, previewing]);
+
+  const handleCreate = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const id = await createNewResume();
+      if (id) navigate(`/edit-resume/${id}`);
+      else toastError("Couldn't create a new resume. Check your connection and try again.");
+    } finally {
+      setCreating(false);
+    }
   };
 
-  /* ═══════════════════════════════════════════════════════════
-     RENDER
-  ═══════════════════════════════════════════════════════════ */
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteResume(id);
+    } finally {
+      setDeletingId(null);
+      setDeleteConfirm(null);
+    }
+  };
+
+  const handleDownload = async (resume: SavedResume) => {
+    if (exportingId) return;
+    if (!isPdfLibraryLoaded()) {
+      toastError("The PDF library didn't load (ad-blocker or offline). Open the resume and use DOCX instead.");
+      return;
+    }
+    // Render the resume off-screen at full size so it can be captured
+    setExportingId(resume._id);
+    try {
+      await nextFrame();
+      await nextFrame();
+      if (document.fonts?.ready) await document.fonts.ready;
+      if (!exportRef.current) throw new Error("Export target is not mounted");
+      await exportElementToPdf(exportRef.current, resume.title || toRenderable(resume).data.personalDetails.fullName || "Resume");
+      try {
+        localStorage.setItem(`resumeExported:${resume._id}`, "true");
+      } catch {}
+      trackEvent("funnel_resume_exported", { format: "pdf", resumeId: resume._id });
+      toastSuccess("PDF downloaded.");
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      toastError("PDF export failed. Open the resume and try DOCX instead.");
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  const hasResumes = resumeHistory.length > 0;
+
   return (
-    <div
-      className="min-h-screen relative font-sans"
-      style={
-        {
-          background: C.base,
-          color: C.textPrimary,
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-        } as React.CSSProperties
-      }
-    >
-      {/* Ambient blobs — same as landing page, lighter */}
-      <div
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div
-          className="absolute animate-blob"
-          style={{
-            top: "-20%",
-            left: "-10%",
-            width: "50vw",
-            height: "50vw",
-            borderRadius: "50%",
-            background: "#16532d",
-            opacity: 0.22,
-            filter: "blur(110px)",
-          }}
-        />
-        <div
-          className="absolute animate-blob animation-delay-2000"
-          style={{
-            bottom: "-15%",
-            right: "-12%",
-            width: "40vw",
-            height: "40vw",
-            borderRadius: "50%",
-            background: "#134e3e",
-            opacity: 0.18,
-            filter: "blur(120px)",
-          }}
-        />
-      </div>
-
-      {/* ─── Page body ─── */}
-      <div
-        className="relative z-10 max-w-6xl mx-auto px-4 sm:px-8 py-10"
-        style={
-          {
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          } as React.CSSProperties
-        }
-      >
-        {/* ══ HEADER ══════════════════════════════════════════ */}
-        <div className="mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-          {/* Title area */}
-          <div className="flex-1 w-full">
-            <div className="flex items-center gap-4 mb-1">
-              {isEditingTitle ? (
-                <input
-                  type="text"
-                  value={editingTitleValue}
-                  onChange={handleTitleChange}
-                  onBlur={handleTitleBlur}
-                  onKeyDown={handleTitleKeyDown}
-                  autoFocus
-                  className="text-2xl sm:text-3xl font-bold rounded-xl px-4 py-2 focus:outline-none w-full max-w-sm"
-                  style={{
-                    background: "rgba(255,255,255,0.08)",
-                    border: `1px solid rgba(74,222,128,0.50)`,
-                    color: C.textPrimary,
-                    boxShadow: "0 0 0 3px rgba(74,222,128,0.10)",
-                  }}
-                />
-              ) : (
-                <div
-                  className="flex items-center gap-4 cursor-pointer group w-full"
-                  onClick={() => setIsEditingTitle(true)}
-                  title="Click to rename"
-                >
-                  <div
-                    className="p-3 rounded-xl flex-shrink-0"
-                    style={{
-                      background: C.greenMuted,
-                      border: `1px solid ${C.greenBorder}`,
-                    }}
-                  >
-                    <FileText className="h-6 w-6" style={{ color: C.green }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h1
-                      className="text-2xl sm:text-3xl font-bold truncate tracking-tight transition-colors"
-                      style={{ color: C.textPrimary }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = C.green)
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = C.textPrimary)
-                      }
-                    >
-                      {currentTitle || "Dashboard"}
-                    </h1>
-                    <p className="text-sm" style={{ color: C.textMuted }}>
-                      Manage all your tailored resumes
-                    </p>
-                  </div>
-                  <Pencil
-                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                    style={{ color: C.green }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Header actions */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              onClick={() => navigate("/")}
-              className="btn-ghost flex items-center gap-2 py-2.5 px-4 rounded-xl text-sm"
-            >
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen font-inter text-[#14161A]" style={{ background: PAGE_BG }}>
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 border-b border-[#E9EAEE] bg-white">
+        <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between gap-3 px-4 sm:px-8">
+          <Link to="/" className="flex items-center gap-2" aria-label="ResumeAI home">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2B5FD9]">
+              <FileText className="h-4 w-4 text-white" strokeWidth={2.5} />
+            </span>
+            <span className="hidden text-xl font-semibold tracking-tight sm:block">ResumeAI</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <SecondaryButton onClick={() => navigate("/")} className="!px-3.5 !py-2">
+              <ArrowLeft size={15} />
               Home
-            </button>
-            <button
-              onClick={handleCreateNewResume}
-              className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 py-2.5 px-6 rounded-xl text-sm"
-            >
-              <Plus className="h-4 w-4" />
-              New Resume
-            </button>
+            </SecondaryButton>
+            <PrimaryButton onClick={handleCreate} disabled={creating} className="!px-4 !py-2">
+              {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+              New resume
+            </PrimaryButton>
           </div>
         </div>
+      </header>
 
-        {/* ══ SEARCH + SORT ════════════════════════════════════ */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4"
-              style={{ color: C.textMuted }}
-            />
-            <input
-              type="text"
-              placeholder="Find resume by title, job, or name…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="glass-input w-full pl-11 pr-4 py-3 rounded-xl text-sm"
-            />
-          </div>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My resumes</h1>
+          <p className="mt-1 text-sm text-[#6B7280]">
+            {isLoading
+              ? "Loading your resumes…"
+              : hasResumes
+                ? `${resumeHistory.length} ${resumeHistory.length === 1 ? "resume" : "resumes"} · pick one to keep editing`
+                : "Everything you create will show up here."}
+          </p>
+        </div>
 
-          {/* Sort dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowSortMenu((v) => !v)}
-              className="btn-ghost flex items-center justify-between w-full sm:w-48 px-4 py-3 rounded-xl text-sm gap-2"
-              onBlur={() => setTimeout(() => setShowSortMenu(false), 150)}
-            >
-              <Filter className="h-4 w-4" style={{ color: C.textMuted }} />
-              <span className="flex-1 text-left">{sortLabels[sortBy]}</span>
-              <ChevronDown
-                className="h-4 w-4 transition-transform"
-                style={{
-                  color: C.textMuted,
-                  transform: showSortMenu ? "rotate(180deg)" : "rotate(0deg)",
-                }}
+        {/* Search + sort */}
+        {hasResumes && (
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+            <label className="relative flex-1">
+              <span className="sr-only">Search resumes</span>
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AA0AB]" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Find a resume by title, job or name…"
+                className="w-full rounded-xl border border-[#E3E5EA] bg-white py-2.5 pl-10 pr-3 text-sm text-[#14161A] placeholder:text-[#9AA0AB] focus:border-[#2B5FD9] focus:outline-none focus:ring-2 focus:ring-[#2B5FD9]/15"
               />
-            </button>
-            {showSortMenu && (
-              <div
-                className="absolute right-0 top-full mt-2 w-full sm:w-48 rounded-xl overflow-hidden z-20 py-1"
-                style={{
-                  background: "rgba(13,21,18,0.95)",
-                  border: `1px solid ${C.surfaceBorder}`,
-                  backdropFilter: "blur(20px)",
-                  WebkitBackdropFilter: "blur(20px)",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.40)",
-                }}
-              >
-                {(
-                  [
-                    { value: "recent", label: "Most Recent" },
-                    { value: "oldest", label: "Oldest" },
-                    { value: "name-asc", label: "Title (A–Z)" },
-                    { value: "name-desc", label: "Title (Z–A)" },
-                  ] as { value: SortOption; label: string }[]
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => {
-                      setSortBy(opt.value);
-                      setShowSortMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm font-medium transition-colors"
-                    style={{
-                      color: sortBy === opt.value ? C.green : C.textSecondary,
-                      background:
-                        sortBy === opt.value ? C.greenMuted : "transparent",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== opt.value)
-                        e.currentTarget.style.background =
-                          "rgba(255,255,255,0.06)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== opt.value)
-                        e.currentTarget.style.background = "transparent";
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            </label>
+            <SelectField aria-label="Sort resumes" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="sm:w-48">
+              <option value="recent">Most recent</option>
+              <option value="oldest">Oldest</option>
+              <option value="name-asc">Title (A–Z)</option>
+              <option value="name-desc">Title (Z–A)</option>
+            </SelectField>
           </div>
-        </div>
+        )}
 
-        {/* ══ GRID CONTENT ═════════════════════════════════════ */}
         {isLoading ? (
-          <div className="text-center py-20" style={{ color: C.textMuted }}>
-            Loading Dashboard…
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-[#E9EAEE] bg-white">
+                <div className="h-[230px] bg-[#EEF0F3]" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-2/3 rounded bg-[#EEF0F3]" />
+                  <div className="h-3 w-1/2 rounded bg-[#EEF0F3]" />
+                  <div className="h-9 rounded-lg bg-[#EEF0F3]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !hasResumes ? (
+          <div className="rounded-2xl border border-dashed border-[#CDD2DB] bg-white px-6 py-20 text-center">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF3FF]">
+              <FileText className="h-6 w-6 text-[#2B5FD9]" />
+            </span>
+            <h2 className="mt-5 text-lg font-semibold">No resumes yet</h2>
+            <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-[#6B7280]">
+              Start with a template, let AI sharpen the wording, and download it when you're ready.
+            </p>
+            <PrimaryButton onClick={handleCreate} disabled={creating} className="mx-auto mt-6">
+              {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Create your first resume
+            </PrimaryButton>
           </div>
         ) : filteredAndSorted.length === 0 ? (
-          <div
-            className="text-center py-24 rounded-2xl"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: `1px solid ${C.surfaceBorder}`,
-            }}
-          >
-            <div
-              className="mx-auto w-14 h-14 rounded-full flex items-center justify-center mb-4"
-              style={{ background: "rgba(255,255,255,0.07)" }}
-            >
-              <Search className="h-6 w-6" style={{ color: C.textMuted }} />
-            </div>
-            <h3
-              className="text-lg font-bold mb-2"
-              style={{ color: C.textPrimary }}
-            >
-              No resumes found
-            </h3>
-            <p className="text-sm" style={{ color: C.textMuted }}>
-              Adjust your search or create a new resume to get started.
-            </p>
+          <div className="rounded-2xl border border-[#E9EAEE] bg-white px-6 py-16 text-center">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#F3F4F6]">
+              <Search className="h-5 w-5 text-[#9AA0AB]" />
+            </span>
+            <h2 className="mt-4 text-lg font-semibold">No resumes match “{searchTerm.trim()}”</h2>
+            <p className="mt-1 text-sm text-[#6B7280]">Try a different title, job or name.</p>
+            <SecondaryButton onClick={() => setSearchTerm("")} className="mx-auto mt-5 !py-2">
+              Clear search
+            </SecondaryButton>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
-              {displayedResumes.map((resume, i) => {
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {displayed.map((resume) => {
                 const isActive = resume._id === activeResumeId;
-                const isDeleting = deleteConfirm === resume._id;
-
+                const isConfirming = deleteConfirm === resume._id;
+                const jobTitle = resume.resumeData?.personalDetails?.jobTitle;
+                const title = resume.title || "Untitled Resume";
                 return (
-                  <div
+                  <article
                     key={resume._id}
-                    className={`relative rounded-2xl p-5 transition-all ${
-                      isActive ? "glass-card-active" : "glass-card"
-                    }`}
-                    style={{
-                      /* Cascade entrance on first render */
-                      animationDelay: `${i * 50}ms`,
-                    }}
+                    className={cx(
+                      "group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-shadow hover:shadow-[0_14px_40px_rgba(16,24,40,0.09)]",
+                      isActive ? "border-[#2B5FD9]/50 ring-1 ring-[#2B5FD9]/20" : "border-[#E9EAEE]",
+                    )}
                   >
-                    {/* ── Card header ── */}
-                    <div className="flex justify-between items-start mb-4 gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className="p-2 rounded-xl flex-shrink-0"
-                          style={{
-                            background: isActive
-                              ? "rgba(74,222,128,0.18)"
-                              : C.greenMuted,
-                            border: `1px solid ${
-                              isActive ? "rgba(74,222,128,0.35)" : C.greenBorder
-                            }`,
-                          }}
-                        >
-                          <FileText
-                            className="h-4 w-4"
-                            style={{ color: C.green }}
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <h3
-                            className="font-semibold truncate"
-                            style={{ color: C.textPrimary }}
-                          >
-                            {resume.title || "Untitled"}
-                          </h3>
-                          {isActive && (
-                            <span
-                              className="text-[10px] font-bold uppercase tracking-wider"
-                              style={{ color: C.green }}
-                            >
-                              Active
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Share toast */}
-                      {shareToast === resume._id && (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                          style={{
-                            background: C.greenMuted,
-                            color: C.green,
-                          }}
-                        >
-                          Link copied!
-                        </span>
-                      )}
-                    </div>
-
-                    {/* ── Meta ── */}
-                    <div className="space-y-1.5 mb-4">
-                      {resume.resumeData?.personalDetails?.jobTitle && (
-                        <div
-                          className="flex items-center gap-2 text-sm"
-                          style={{ color: C.textSecondary }}
-                        >
-                          <Briefcase
-                            className="h-3.5 w-3.5 flex-shrink-0"
-                            style={{ color: C.green }}
-                          />
-                          <span className="truncate">
-                            {resume.resumeData.personalDetails.jobTitle}
-                          </span>
-                        </div>
-                      )}
-                      <div
-                        className="flex items-center gap-2 text-sm"
-                        style={{ color: C.textMuted }}
-                      >
-                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span>Edited {formatDate(resume.updatedAt)}</span>
-                      </div>
-                    </div>
-
-                    {/* ── Action row ── */}
-                    <div
-                      className="flex items-center gap-2 pt-4"
-                      style={{ borderTop: `1px solid ${C.divider}` }}
-                    >
-                      {/* Edit — primary */}
+                    {/* Thumbnail doubles as the main "open" target */}
+                    <div className="relative border-b border-[#E9EAEE]">
+                      <ResumeThumbnail resume={resume} />
                       <button
-                        onClick={() => handleEditResume(resume._id)}
-                        className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
-                        style={{
-                          background: C.greenMuted,
-                          border: `1px solid ${C.greenBorder}`,
-                          color: C.green,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background =
-                            "rgba(74,222,128,0.20)";
-                          e.currentTarget.style.borderColor =
-                            "rgba(74,222,128,0.42)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = C.greenMuted;
-                          e.currentTarget.style.borderColor = C.greenBorder;
-                        }}
-                      >
-                        Edit
-                      </button>
-
-                      {/* Icon buttons */}
-                      {[
-                        {
-                          icon: Eye,
-                          title: "Quick Preview",
-                          onClick: () => handlePreviewResume(resume._id),
-                          loading: false,
-                        },
-                        {
-                          icon: Download,
-                          title:
-                            isDownloadingPdf === resume._id
-                              ? "Exporting…"
-                              : "Export PDF",
-                          onClick: () => handleDownloadPdf(resume._id),
-                          loading: isDownloadingPdf === resume._id,
-                        },
-                        {
-                          icon: Trash2,
-                          title: "Delete",
-                          onClick: () => setDeleteConfirm(resume._id),
-                          loading: false,
-                          danger: true,
-                        },
-                      ].map(
-                        ({ icon: Icon, title, onClick, loading, danger }) => (
-                          <button
-                            key={title}
-                            onClick={onClick}
-                            title={title}
-                            disabled={loading}
-                            className="px-3 py-2 rounded-xl transition-all disabled:opacity-50"
-                            style={{
-                              background: danger
-                                ? "rgba(239,68,68,0.08)"
-                                : "rgba(255,255,255,0.06)",
-                              border: `1px solid ${
-                                danger
-                                  ? "rgba(239,68,68,0.20)"
-                                  : C.surfaceBorder
-                              }`,
-                              color: danger ? "#f87171" : C.textSecondary,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = danger
-                                ? "rgba(239,68,68,0.16)"
-                                : "rgba(255,255,255,0.11)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = danger
-                                ? "rgba(239,68,68,0.08)"
-                                : "rgba(255,255,255,0.06)";
-                            }}
-                          >
-                            <Icon className="h-4 w-4" />
-                          </button>
-                        ),
-                      )}
+                        type="button"
+                        onClick={() => navigate(`/edit-resume/${resume._id}`)}
+                        aria-label={`Edit ${title}`}
+                        className="absolute inset-0 bg-[#14161A]/0 transition-colors hover:bg-[#14161A]/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B5FD9]"
+                      />
                     </div>
 
-                    {/* ── Delete confirmation overlay ── */}
-                    {isDeleting && (
-                      <div
-                        className="absolute inset-0 rounded-2xl flex items-center justify-center p-5 z-10 modal-enter"
-                        style={{
-                          background: "rgba(10,17,14,0.92)",
-                          backdropFilter: "blur(12px)",
-                          WebkitBackdropFilter: "blur(12px)",
-                          border: "1px solid rgba(239,68,68,0.30)",
-                        }}
-                      >
-                        <div className="text-center w-full">
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3"
-                            style={{ background: "rgba(239,68,68,0.12)" }}
-                          >
-                            <Trash2
-                              className="h-5 w-5"
-                              style={{ color: "#f87171" }}
-                            />
+                    <div className="flex flex-1 flex-col p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="min-w-0 truncate text-[15px] font-semibold" title={title}>
+                          {title}
+                        </h3>
+                        {isActive && (
+                          <span className="shrink-0 rounded-md bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#2B5FD9]">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1 text-[13px] text-[#6B7280]">
+                        {jobTitle && (
+                          <div className="flex items-center gap-2">
+                            <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{jobTitle}</span>
                           </div>
-                          <p
-                            className="font-bold mb-1"
-                            style={{ color: C.textPrimary }}
-                          >
-                            Delete resume?
-                          </p>
-                          <p
-                            className="text-xs mb-4"
-                            style={{ color: C.textMuted }}
-                          >
-                            "{resume.title || "Untitled"}" will be permanently
-                            removed.
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className="flex-1 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
-                              style={{
-                                background: "rgba(255,255,255,0.08)",
-                                border: `1px solid ${C.surfaceBorder}`,
-                                color: C.textSecondary,
-                              }}
-                            >
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 shrink-0" />
+                          <span>Edited {formatDate(resume.updatedAt)}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-2 border-t border-[#E9EAEE] pt-4">
+                        <PrimaryButton onClick={() => navigate(`/edit-resume/${resume._id}`)} className="flex-1 !py-2">
+                          Edit
+                        </PrimaryButton>
+                        <IconAction label="Preview" onClick={() => setPreviewId(resume._id)}>
+                          <Eye size={16} />
+                        </IconAction>
+                        <IconAction label={exportingId === resume._id ? "Exporting…" : "Download PDF"} disabled={exportingId !== null} onClick={() => handleDownload(resume)}>
+                          {exportingId === resume._id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        </IconAction>
+                        <IconAction label="Delete" danger onClick={() => setDeleteConfirm(resume._id)}>
+                          <Trash2 size={16} />
+                        </IconAction>
+                      </div>
+                    </div>
+
+                    {isConfirming && (
+                      <div
+                        role="alertdialog"
+                        aria-label={`Delete ${title}?`}
+                        className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 p-5 backdrop-blur-sm"
+                      >
+                        <div className="w-full text-center">
+                          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#FEECEC]">
+                            <Trash2 className="h-5 w-5 text-[#DC2626]" />
+                          </span>
+                          <p className="mt-3 font-semibold">Delete this resume?</p>
+                          <p className="mx-auto mt-1 max-w-[16rem] break-words text-xs text-[#6B7280]">“{title}” will be permanently removed.</p>
+                          <div className="mt-4 grid grid-cols-2 gap-2">
+                            <SecondaryButton onClick={() => setDeleteConfirm(null)} disabled={deletingId === resume._id} className="!py-2">
                               Cancel
-                            </button>
+                            </SecondaryButton>
                             <button
-                              onClick={() => handleDeleteResume(resume._id)}
-                              className="flex-1 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
-                              style={{
-                                background: "rgba(239,68,68,0.75)",
-                                color: "#fff",
-                              }}
+                              type="button"
+                              onClick={() => handleDelete(resume._id)}
+                              disabled={deletingId === resume._id}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#B91C1C] disabled:opacity-60"
                             >
+                              {deletingId === resume._id && <Loader2 size={14} className="animate-spin" />}
                               Delete
                             </button>
                           </div>
                         </div>
                       </div>
                     )}
-                  </div>
+                  </article>
                 );
               })}
             </div>
 
-            {/* Load more */}
             {hasMore && (
-              <div className="text-center mt-4">
-                <button
-                  onClick={() => setItemsToShow((p) => p + 6)}
-                  className="btn-ghost px-6 py-2.5 rounded-xl text-sm"
-                >
-                  Load More (
-                  {filteredAndSorted.length - displayedResumes.length})
-                </button>
+              <div className="mt-8 text-center">
+                <SecondaryButton onClick={() => setItemsToShow((n) => n + PAGE_SIZE)}>
+                  Show more ({filteredAndSorted.length - displayed.length})
+                </SecondaryButton>
               </div>
             )}
           </>
         )}
-      </div>
+      </main>
 
-      {/* ══ PREVIEW MODAL ════════════════════════════════════ */}
-      {previewingResumeId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{
-            background: "rgba(0,0,0,0.75)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-          }}
-        >
-          <div
-            className="w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden rounded-2xl modal-enter"
-            style={{
-              background: "rgba(13,21,18,0.92)",
-              border: `1px solid ${C.surfaceBorder}`,
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              boxShadow: "0 24px 80px rgba(0,0,0,0.60)",
-            }}
-          >
-            {/* Modal header */}
-            <div
-              className="flex justify-between items-center p-5 flex-shrink-0"
-              style={{ borderBottom: `1px solid ${C.divider}` }}
-            >
-              <h2
-                className="text-lg font-bold flex items-center gap-2"
-                style={{ color: C.textPrimary }}
-              >
-                <Eye className="w-5 h-5" style={{ color: C.green }} />
-                Live Document Preview
-              </h2>
-              <button
-                onClick={() => setPreviewingResumeId(null)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-xl font-light transition-colors"
-                style={{ color: C.textMuted }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "rgba(255,255,255,0.08)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                ×
-              </button>
-            </div>
+      {previewing && (
+        <PreviewModal
+          resume={previewing}
+          downloading={exportingId === previewing._id}
+          onClose={() => setPreviewId(null)}
+          onEdit={() => navigate(`/edit-resume/${previewing._id}`)}
+          onDownload={() => handleDownload(previewing)}
+        />
+      )}
 
-            {/* Resume preview */}
-            <div
-              className="overflow-y-auto w-full p-8 flex justify-center flex-1"
-              style={
-                {
-                  background: "#F7F9FC",
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                } as React.CSSProperties
-              }
-            >
-              <div
-                className="bg-white shadow-lg overflow-hidden shrink-0"
-                style={{ transform: "scale(1)", transformOrigin: "top center" }}
-              >
-                <ResumePreview />
-              </div>
+      {/* Off-screen, full-size copy used only while a PDF is being captured */}
+      {exporting && (
+        <div aria-hidden="true" className="pointer-events-none fixed top-0" style={{ left: -10000, width: PAGE_WIDTH }}>
+          <RenderBoundary fallback={null}>
+            <div ref={exportRef} className="bg-white" style={{ width: PAGE_WIDTH }}>
+              <ResumeTemplate template={toRenderable(exporting).template} data={toRenderable(exporting).data} />
             </div>
-          </div>
+          </RenderBoundary>
         </div>
       )}
     </div>

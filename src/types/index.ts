@@ -111,7 +111,3 @@ export type TemplateID =
 
 export type SaveStatus = "saving" | "saved" | "error";
 
-export interface ChatMessage {
-  sender: "user" | "bot";
-  text: string;
-}

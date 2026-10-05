@@ -6,7 +6,6 @@ import { toastError } from "@/utils/toast";
 
 import LinkedInImportModal from "@/components/editor/LinkedInImportModal";
 import ShareModal from "@/components/editor/ShareModal";
-import AIChatPanel from "@/components/editor/AIChatPanel";
 import AIGenerateResumeModal from "@/components/editor/AIGenerateResumeModal";
 import { EditorAIProvider } from "@/components/editor/v3/EditorAI";
 import { TopNav, DocumentBar } from "@/components/editor/v3/EditorChrome";
@@ -152,7 +151,6 @@ export const EditorWorkspace: React.FC = () => {
         </main>
 
         <AnalyzeDrawer tab={analyzeTab} onTabChange={setAnalyzeTab} onClose={closeAnalyze} />
-        <AIChatPanel />
         <LinkedInImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
         <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
         <AIGenerateResumeModal isOpen={isGenerateOpen} onClose={() => setIsGenerateOpen(false)} />
@@ -207,7 +205,7 @@ const EditorPage: React.FC = () => {
 
     // No id in the URL: start a new resume and move to its own URL
     setPhase("loading");
-    Promise.resolve(createNewResume() as unknown as Promise<string | null>).then((newId) => {
+    createNewResume().then((newId) => {
       if (!mountedRef.current) return;
       if (newId) {
         handledRef.current = newId;
