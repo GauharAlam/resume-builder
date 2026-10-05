@@ -40,6 +40,23 @@ export const EditorWorkspace: React.FC = () => {
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
+  // Right panel can shrink to a rail on large screens; the choice is remembered
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("editor:inspectorCollapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleInspector = useCallback(() => {
+    setInspectorCollapsed((prev) => {
+      try {
+        localStorage.setItem("editor:inspectorCollapsed", prev ? "0" : "1");
+      } catch {}
+      return !prev;
+    });
+  }, []);
+
   // Offer the "how do you want to start" choices once per empty resume
   const onboardingKey = `editor:onboarded:${activeResumeId ?? "new"}`;
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -158,7 +175,14 @@ export const EditorWorkspace: React.FC = () => {
           ))}
         </div>
 
-        <main className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] lg:grid-cols-[340px_minmax(0,1fr)_300px] xl:grid-cols-[400px_minmax(0,1fr)_340px]">
+        <main
+          className={cx(
+            "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)]",
+            inspectorCollapsed
+              ? "lg:grid-cols-[340px_minmax(0,1fr)_84px] xl:grid-cols-[400px_minmax(0,1fr)_84px]"
+              : "lg:grid-cols-[340px_minmax(0,1fr)_300px] xl:grid-cols-[400px_minmax(0,1fr)_340px]",
+          )}
+        >
           <div className={cx(pane("build"), "p-3 sm:p-5 lg:pr-0")}>
             <BuilderPanel tab={builderTab} onTabChange={setBuilderTab} openSection={openSection} onOpenSection={setOpenSection} />
           </div>
@@ -172,7 +196,12 @@ export const EditorWorkspace: React.FC = () => {
             />
           </div>
           <div className={cx(pane("design"), "p-3 sm:p-5 lg:pl-0")}>
-            <InspectorPanel onOpenSection={showSection} onOpenAnalyze={setAnalyzeTab} />
+            <InspectorPanel
+              onOpenSection={showSection}
+              onOpenAnalyze={setAnalyzeTab}
+              collapsed={inspectorCollapsed}
+              onToggleCollapsed={toggleInspector}
+            />
           </div>
         </main>
 

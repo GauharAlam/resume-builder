@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Sparkles, ChevronLeft, ChevronRight, Loader2, Minus, Plus, CheckCircle2 } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, Loader2, Minus, Plus, CheckCircle2, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useResume } from "@/hooks";
 import { suggestSkills } from "@/services/aiService";
 import { toastError, toastSuccess } from "@/utils/toast";
@@ -69,7 +69,10 @@ const Stepper: React.FC<{
 const InspectorPanel: React.FC<{
   onOpenSection: (section: BuilderSection) => void;
   onOpenAnalyze: (tab: AnalyzeTab) => void;
-}> = ({ onOpenSection, onOpenAnalyze }) => {
+  /** Desktop only: shrink the panel to a slim rail so the resume gets the space */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+}> = ({ onOpenSection, onOpenAnalyze, collapsed = false, onToggleCollapsed }) => {
   const { resumeData, updateResumeData, updateField, template, setTemplate, activeResumeId } = useResume();
   const option = getTemplateOption(template);
   const customization = resumeData.customization || { fontFamily: "sans" as FontFamily, fontSize: "medium" as const, layout: "standard" as const };
@@ -174,7 +177,62 @@ const InspectorPanel: React.FC<{
   const fontValue = FONT_OPTIONS.some((f) => f.id === customization.fontFamily) ? customization.fontFamily : "sans";
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col gap-5 overflow-y-auto">
+    <>
+      {/* Collapsed rail (large screens): the score and open suggestions stay in view */}
+      {collapsed && (
+        <aside aria-label="Design and suggestions (collapsed)" className="hidden h-full flex-col items-center gap-3 rounded-2xl border border-[#E9EAEE] bg-white py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:flex">
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label="Open design panel"
+            aria-expanded={false}
+            title="Open design panel"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#3F4551] transition-colors hover:bg-[#F0F1F4]"
+          >
+            <PanelRightOpen size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label={`Resume strength ${strength.score} out of 100. Open panel`}
+            title={`Resume strength: ${strength.score}/100`}
+            className="relative h-11 w-11 rounded-full transition-transform hover:scale-105"
+          >
+            <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#E3E5EA" strokeWidth="3.5" />
+              <circle
+                cx="18"
+                cy="18"
+                r="15"
+                fill="none"
+                stroke={strength.score >= 80 ? "#16A34A" : strength.score >= 50 ? "#2B5FD9" : "#D97706"}
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeDasharray={`${(strength.score / 100) * 94.25} 94.25`}
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold tabular-nums text-[#14161A]">{strength.score}</span>
+          </button>
+          {suggestions.length > 0 && (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-label={`${suggestions.length} ${suggestions.length === 1 ? "suggestion" : "suggestions"}. Open panel`}
+              title={`${suggestions.length} ${suggestions.length === 1 ? "suggestion" : "suggestions"}`}
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-[#EEF3FF] text-[#2B5FD9] transition-colors hover:bg-[#E0E9FF]"
+            >
+              <Sparkles size={16} fill="#2B5FD9" />
+              <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#2B5FD9] px-1 text-[10px] font-semibold text-white">
+                {suggestions.length}
+              </span>
+            </button>
+          )}
+        </aside>
+      )}
+
+      {/* Full panel. Stays mounted when collapsed so a running skill scan and ignored suggestions aren't lost;
+          on small screens it is its own tab, so collapsing never applies there. */}
+      <aside className={cx("flex h-full min-h-0 w-full flex-col gap-5 overflow-y-auto", collapsed && "lg:hidden")}>
       {/* AI suggestion card */}
       <section
         aria-label="AI suggestions"
@@ -204,6 +262,18 @@ const InspectorPanel: React.FC<{
               {strength.checks.filter((c) => c.done).length} of {strength.checks.length} essentials in place
             </div>
           </div>
+          {onToggleCollapsed && (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-label="Collapse design panel"
+              aria-expanded={true}
+              title="Collapse panel"
+              className="ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#3F4551] transition-colors hover:bg-white/70 lg:flex"
+            >
+              <PanelRightClose size={17} />
+            </button>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <Sparkles size={18} className="text-[#2B5FD9]" fill="#2B5FD9" />
@@ -377,6 +447,7 @@ const InspectorPanel: React.FC<{
         </div>
       </section>
     </aside>
+    </>
   );
 };
 
