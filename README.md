@@ -1,30 +1,105 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ResumeAI — AI Resume Builder (Frontend)
 
-# Run and deploy your AI Studio app
+A web app for building, tailoring and exporting resumes with AI help. This repository is the React frontend; the API lives in [Backend_Resume](https://github.com/GauharAlam/Backend_Resume).
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/14d6_Yo0lHJJoRxmZQmWEKUHr4t6c5Z1k
+- **Three-panel editor** — a section-by-section builder, a live resume page, and a design panel side by side. On small screens the panels become tabs.
+- **Five templates** — Clean Serif, Professional IT, ATS Modern, Standard Classic and Tech Minimalist, with live thumbnails of your own resume.
+- **AI writing tools** — rewrite a summary or bullet list, draft bullets for a role, change tone, improve clarity, or tailor text to a job description. Every suggestion is reviewed before it is applied.
+- **Click-to-edit on the page** — in the Clean Serif template, select text on the resume to edit it in place or send it to AI.
+- **Analysis** — ATS score, job-description match and cover-letter generation.
+- **Design controls** — font, text size, accent colour, spacing and line height.
+- **Export and share** — download as PDF or DOCX, or publish a public link.
+- **Autosave with undo/redo** — changes are saved to your account as you type.
+- **LinkedIn import** and **AI-generated starter resumes**.
 
-## Run Locally
+## Tech stack
 
-**Prerequisites:**  Node.js
+| Area | Choice |
+| --- | --- |
+| UI | React 18, TypeScript, Vite |
+| Styling | Tailwind CSS (loaded from the CDN in `index.html`) |
+| Routing | React Router 6 |
+| Auth | Clerk |
+| Icons | lucide-react |
+| Export | jsPDF + html2canvas (PDF), docx (DOCX) |
 
+## Getting started
 
-1. Install dependencies:
-   `npm install`
-2. Set the frontend environment variables in `.env` or `.env.local`
-   - `GEMINI_API_KEY=...`
-   - `VITE_API_BASE_URL=http://localhost:5001/api`
-   - `VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com`
-3. Run the app:
-   `npm run dev`
+**Prerequisites:** Node.js 18 or newer, a [Clerk](https://clerk.com) application, and the backend running locally or deployed.
 
-## Google Sign-In Setup
+```bash
+git clone https://github.com/GauharAlam/resume-builder.git
+cd resume-builder
+npm install
+cp .env.example .env   # then fill in the values below
+npm run dev
+```
 
-To enable Google sign-in, set the same Google OAuth web client ID in both apps:
+The dev server runs at `http://localhost:3000`.
 
-- Frontend: `VITE_GOOGLE_CLIENT_ID`
-- Backend: `GOOGLE_CLIENT_ID`
+### Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | Yes in production | Base URL of the backend API, e.g. `http://localhost:5001/api`. In development it defaults to port 5001 on the current host. |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Yes | Publishable key from your Clerk application. |
+| `VITE_RAPIDAPI_KEY` | Optional | RapidAPI key used for LinkedIn profile import. |
+| `VITE_ANALYTICS_ENDPOINT` | Optional | Overrides the analytics endpoint. Defaults to `<VITE_API_BASE_URL>/analytics/events`. |
+
+AI requests go through the backend, so no AI provider key is needed here. Never commit `.env`.
+
+### Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Build for production into `dist/` |
+| `npm run preview` | Serve the production build locally |
+
+## Routes
+
+| Path | Access | Page |
+| --- | --- | --- |
+| `/` | Public | Landing page |
+| `/login`, `/register` | Public | Clerk sign-in and sign-up |
+| `/view/:shareId` | Public | Shared, read-only resume |
+| `/history` | Signed in | Dashboard of saved resumes |
+| `/try` | Signed in | Creates a new resume and opens it |
+| `/edit-resume/:id` | Signed in | Editor for one resume |
+
+Signed-out visitors who open a protected page are sent to sign in and returned to that page afterwards.
+
+## Project structure
+
+```
+src/
+├── App.tsx                  Routes and providers
+├── features/
+│   ├── auth/                Login, register, route guard
+│   └── resume/              Landing page, editor page, public resume page
+├── components/
+│   ├── editor/              Dashboard, modals and analysis panels
+│   │   └── v3/              Editor UI: builder, canvas, inspector, top bars
+│   ├── templates/           Resume templates and the template registry
+│   ├── common/              Shared components (toasts, spinner)
+│   └── icons/
+├── hooks/                   useResume (resume state, autosave, undo/redo)
+├── context/                 Auth and theme context
+├── services/                API client, AI and analytics calls
+├── utils/                   DOCX export, toasts, helpers
+└── types/                   Shared TypeScript types
+```
+
+## Deployment
+
+The app is a static single-page build. `netlify.toml` and `vercel.json` are included and both rewrite every path to `index.html` so client-side routes work.
+
+1. Set the environment variables above in your hosting provider.
+2. Build with `npm run build` and publish the `dist/` folder.
+3. Add the deployed frontend URL to `CORS_ORIGINS` on the backend.
+
+## Related
+
+- Backend API: [GauharAlam/Backend_Resume](https://github.com/GauharAlam/Backend_Resume)
