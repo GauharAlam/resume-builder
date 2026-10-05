@@ -17,9 +17,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useResume } from "@/hooks";
 import { ResumeData, TemplateID } from "@/types";
 import { ResumeTemplate } from "@/components/templates";
-import { toastError, toastSuccess } from "@/utils/toast";
+import { toastError, toastInfo, toastSuccess } from "@/utils/toast";
 import { trackEvent } from "@/services/analytics";
-import { exportElementToPdf, isPdfLibraryLoaded } from "@/utils/pdfExport";
+import { canPrint, printResume } from "@/utils/printResume";
+import { ensurePdfLibraries, exportElementToPdf } from "@/utils/pdfExport";
 import { PrimaryButton, SecondaryButton, SelectField, cx } from "./v3/ui";
 
 type SavedResume = ReturnType<typeof useResume>["resumeHistory"][number];
@@ -301,22 +302,41 @@ const ResumeHistory: React.FC = () => {
 
   const handleDownload = async (resume: SavedResume) => {
     if (exportingId) return;
-    if (!isPdfLibraryLoaded()) {
-      toastError("The PDF library didn't load (ad-blocker or offline). Open the resume and use DOCX instead.");
+    const { data, template } = toRenderable(resume);
+    const fileName = data.personalDetails.fullName || resume.title || "Resume";
+    const markExported = () => {
+      try {
+        localStorage.setItem(`resumeExported:${resume._id}`, "true");
+      } catch {}
+      trackEvent("funnel_resume_exported", { format: "pdf", resumeId: resume._id });
+    };
+
+    // Preferred: the print dialog, which saves a real text PDF
+    if (canPrint()) {
+      try {
+        toastInfo("In the print window, choose “Save as PDF” as the destination.");
+        await printResume({ template, data, title: fileName });
+        markExported();
+      } catch (error) {
+        console.error("Print failed:", error);
+        toastError("Couldn't open the print window. Open the resume and try from the editor.");
+      }
       return;
     }
-    // Render the resume off-screen at full size so it can be captured
+
+    // Fallback: render the resume off-screen at full size and save a picture of it
+    if (!(await ensurePdfLibraries())) {
+      toastError("The PDF tools couldn't be loaded (offline or blocked). Open the resume and use DOCX instead.");
+      return;
+    }
     setExportingId(resume._id);
     try {
       await nextFrame();
       await nextFrame();
       if (document.fonts?.ready) await document.fonts.ready;
       if (!exportRef.current) throw new Error("Export target is not mounted");
-      await exportElementToPdf(exportRef.current, resume.title || toRenderable(resume).data.personalDetails.fullName || "Resume");
-      try {
-        localStorage.setItem(`resumeExported:${resume._id}`, "true");
-      } catch {}
-      trackEvent("funnel_resume_exported", { format: "pdf", resumeId: resume._id });
+      await exportElementToPdf(exportRef.current, fileName);
+      markExported();
       toastSuccess("PDF downloaded.");
     } catch (error) {
       console.error("PDF export failed:", error);

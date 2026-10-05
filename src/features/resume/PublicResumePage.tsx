@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { Download, FileText, Loader2, Lock } from 'lucide-react';
 import apiRequest from '@/services/api';
 import { ResumeData, TemplateID } from '@/types';
-import ProfessionalITTemplate from '@/components/templates/ProfessionalITTemplate';
-import ATSModernTemplate from '@/components/templates/ATSModernTemplate';
-import StandardClassicTemplate from '@/components/templates/StandardClassicTemplate';
-import TechMinimalistTemplate from '@/components/templates/TechMinimalistTemplate';
-import CleanSerifTemplate from '@/components/templates/CleanSerifTemplate';
+import { ResumeTemplate, TEMPLATE_OPTIONS } from '@/components/templates';
+import { printResume } from '@/utils/printResume';
+import { toastError } from '@/utils/toast';
 
 const PublicResumePage: React.FC = () => {
     const { shareId } = useParams<{ shareId: string }>();
@@ -68,59 +67,34 @@ const PublicResumePage: React.FC = () => {
         setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', description);
     }, [resumeData]);
 
-    const renderTemplate = () => {
-        if (!resumeData) return null;
-        
-        // Use the saved template ID, default to professional-it if not found or invalid
-        const templateId = (resumeData as any).template || 'professional-it';
-        const textScale = resumeData.customization?.textScale ?? 1;
-
-        switch (templateId) {
-            case 'professional-it': return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
-            case 'ats-modern': return <ATSModernTemplate data={resumeData} scale={textScale} />;
-            case 'standard-classic': return <StandardClassicTemplate data={resumeData} scale={textScale} />;
-            case 'tech-minimalist': return <TechMinimalistTemplate data={resumeData} scale={textScale} />;
-            case 'clean-serif': return <CleanSerifTemplate data={resumeData} scale={textScale} />;
-            default: return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
-        }
-    };
-
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center h-screen bg-gray-50">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-gray-500 font-medium">Loading professional profile...</p>
-                </div>
+            <div className="flex h-screen items-center justify-center bg-[#F3F4F6]">
+                <Loader2 className="h-6 w-6 animate-spin text-[#2B5FD9]" aria-label="Loading resume" />
             </div>
         );
     }
 
     if (error || !resumeData) {
         return (
-            <div className="flex justify-center items-center h-screen bg-gray-50 p-6">
-                <div className="bg-white p-10 rounded-3xl shadow-xl max-w-md text-center space-y-6">
-                    <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Resume Not Available</h1>
-                        <p className="text-gray-500 mt-2">{error || 'The resume you are looking for is private or doesn\'t exist.'}</p>
-                    </div>
-                    <div className="space-y-3">
+            <div className="flex h-screen items-center justify-center bg-[#F3F4F6] p-6 font-inter text-[#14161A]">
+                <div className="w-full max-w-sm rounded-2xl border border-[#E9EAEE] bg-white p-8 text-center">
+                    <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#F3F4F6] text-[#6B7280]">
+                        <Lock size={20} />
+                    </span>
+                    <h1 className="mt-4 text-lg font-semibold">This resume isn't available</h1>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[#6B7280]">
+                        The link may be wrong, or its owner has turned sharing off.
+                    </p>
+                    <div className="mt-6 space-y-2">
                         <button
                             onClick={() => window.location.reload()}
-                            className="block w-full py-3 bg-white text-gray-900 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+                            className="block w-full rounded-xl border border-[#E3E5EA] py-2.5 text-sm font-medium hover:bg-[#F6F7F9]"
                         >
-                            Try Again
+                            Try again
                         </button>
-                        <a 
-                            href="/"
-                            className="block w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors no-underline"
-                        >
-                            Create Your Own Resume
+                        <a href="/" className="block w-full rounded-xl bg-[#2B5FD9] py-2.5 text-sm font-medium text-white hover:bg-[#2450BD]">
+                            Create your own resume
                         </a>
                     </div>
                 </div>
@@ -128,24 +102,59 @@ const PublicResumePage: React.FC = () => {
         );
     }
 
+    // Saved data can predate newer fields; fill gaps so a template never crashes on it
+    const raw = resumeData as Partial<ResumeData> & { template?: TemplateID };
+    const safeData: ResumeData = {
+        ...(raw as ResumeData),
+        personalDetails: { fullName: '', jobTitle: '', email: '', phone: '', location: '', ...(raw.personalDetails || {}), links: raw.personalDetails?.links || [] },
+        summary: raw.summary || '',
+        experience: raw.experience || [],
+        education: raw.education || [],
+        skills: raw.skills || '',
+        projects: raw.projects || [],
+        accomplishments: raw.accomplishments || [],
+        sectionOrder: raw.sectionOrder || [],
+        accentColor: raw.accentColor || '#4F46E5',
+        customization: { fontFamily: 'sans', fontSize: 'medium', layout: 'standard', ...(raw.customization || {}) },
+    };
+    const template = TEMPLATE_OPTIONS.some((t) => t.id === raw.template) ? (raw.template as TemplateID) : 'professional-it';
+    const name = safeData.personalDetails.fullName || 'Resume';
+
     return (
-        <div className="min-h-screen bg-gray-100 py-12 px-4">
-            <div className="max-w-5xl mx-auto shadow-2xl rounded-sm overflow-hidden bg-white">
-                {renderTemplate()}
-            </div>
-            
-            <div className="mt-12 text-center pb-8 opacity-50 hover:opacity-100 transition-opacity">
-                <p className="text-sm text-gray-500 font-medium">
-                    Powered by <span className="text-emerald-600 font-bold">AI Resume Builder</span>
-                </p>
-                <div className="mt-4 flex justify-center gap-6 text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    <span>Professional</span>
-                    <span>•</span>
-                    <span>AI-Driven</span>
-                    <span>•</span>
-                    <span>Modern</span>
+        <div className="min-h-screen bg-[#F3F4F6] font-inter text-[#14161A]">
+            <header className="sticky top-0 z-10 border-b border-[#E9EAEE] bg-white">
+                <div className="mx-auto flex h-14 max-w-[900px] items-center justify-between gap-3 px-4">
+                    <a href="/" className="flex items-center gap-2" aria-label="ResumeAI home">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#2B5FD9]">
+                            <FileText className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+                        </span>
+                        <span className="text-lg font-semibold tracking-tight">ResumeAI</span>
+                    </a>
+                    <button
+                        onClick={() => printResume({ template, data: safeData, title: name }).catch(() => toastError("Printing isn't available in this browser."))}
+                        className="flex items-center gap-2 rounded-xl border border-[#E3E5EA] bg-white px-3.5 py-2 text-sm font-medium hover:bg-[#F6F7F9]"
+                    >
+                        <Download size={15} />
+                        Save as PDF
+                    </button>
                 </div>
-            </div>
+            </header>
+
+            <main className="mx-auto max-w-[900px] px-3 py-6 sm:py-10">
+                {/* The page keeps its A4 width and scrolls sideways on narrow screens rather than reflowing */}
+                <div className="overflow-x-auto">
+                    <div className="mx-auto w-[794px] bg-white shadow-[0_2px_24px_rgba(16,24,40,0.08)]">
+                        <ResumeTemplate template={template} data={safeData} />
+                    </div>
+                </div>
+                <p className="mt-8 text-center text-sm text-[#6B7280]">
+                    Made with{' '}
+                    <a href="/" className="font-medium text-[#2B5FD9] hover:underline">
+                        ResumeAI
+                    </a>
+                    . Build yours in minutes.
+                </p>
+            </main>
         </div>
     );
 };

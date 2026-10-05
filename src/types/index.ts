@@ -83,6 +83,8 @@ export interface ResumeData {
   projects: Project[];
   accomplishments: Accomplishment[];
   sectionOrder: SectionId[];
+  /** Sections the user has chosen to leave off the page (content is kept) */
+  hiddenSections?: SectionId[];
   accentColor: string;
   customization: TemplateCustomization;
   isPublic?: boolean;

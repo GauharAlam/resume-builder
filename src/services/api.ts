@@ -1,7 +1,6 @@
 // frontend/services/api.ts
-//  const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL  // Your backend URL
 const isLocal = import.meta.env.DEV;
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
 if (!API_BASE_URL) {
   if (!isLocal) {

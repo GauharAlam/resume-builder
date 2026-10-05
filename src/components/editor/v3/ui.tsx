@@ -150,3 +150,82 @@ export const IconButton: React.FC<
     {children}
   </button>
 );
+
+/** Centered dialog with a title bar. Closes on Escape and on backdrop click (unless `busy`). */
+export const Modal: React.FC<{
+  title: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  onClose: () => void;
+  busy?: boolean;
+  widthClass?: string;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, subtitle, icon, onClose, busy = false, widthClass = "max-w-lg", footer, children }) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, busy]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B1220]/50 p-3 sm:p-6"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={cx("modal-enter flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-white font-inter text-[#14161A] shadow-[0_24px_80px_rgba(16,24,40,0.3)]", widthClass)}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-[#E9EAEE] px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {icon && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF3FF] text-[#2B5FD9]">{icon}</span>}
+            <div className="min-w-0">
+              <h2 className="truncate text-[17px] font-semibold">{title}</h2>
+              {subtitle && <p className="mt-0.5 text-sm text-[#6B7280]">{subtitle}</p>}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="Close"
+            className="-mr-1.5 shrink-0 rounded-lg p-2 text-[#6B7280] transition-colors hover:bg-[#F0F1F4] hover:text-[#14161A] disabled:opacity-40"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#E9EAEE] px-5 py-4">{footer}</div>}
+      </div>
+    </div>
+  );
+};
+
+/** Inline message box for errors, warnings and notes inside panels and dialogs. */
+export const Notice: React.FC<{ tone?: "error" | "warning" | "info"; children: React.ReactNode; className?: string }> = ({
+  tone = "info",
+  children,
+  className,
+}) => (
+  <div
+    role={tone === "error" ? "alert" : undefined}
+    className={cx(
+      "rounded-xl px-3.5 py-3 text-sm leading-relaxed",
+      tone === "error" && "bg-[#FEECEC] text-[#B91C1C]",
+      tone === "warning" && "bg-[#FEF6E7] text-[#92400E]",
+      tone === "info" && "bg-[#F5F8FF] text-[#1E3A8A]",
+      className,
+    )}
+  >
+    {children}
+  </div>
+);

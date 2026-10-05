@@ -85,24 +85,31 @@ const defaultDummyData: ResumeData = {
     customization: { fontFamily: 'sans', fontSize: 'medium', layout: 'standard' },
 };
 
-const initialResumeData: ResumeData = {
-    ...defaultDummyData,
-    personalDetails: {
-        fullName: 'Jane Doe',
-        jobTitle: 'Senior Product Manager',
-        email: 'jane.doe@example.com',
-        phone: '555-123-4567',
-        location: 'San Francisco, CA',
-        links: []
-    },
-    summary: 'Results-driven Senior Product Manager with over 8 years of experience in the tech industry. Proven ability to lead cross-functional teams to deliver innovative products that meet user needs and drive business growth.',
-    experience: [
-        { id: safeUUID(), jobTitle: 'Senior Product Manager', company: 'Innovatech Solutions', startDate: 'Jan 2020', endDate: 'Present', description: '• Led the development and launch of a new SaaS platform, resulting in a 30% increase in monthly recurring revenue.\n• Defined product vision, strategy, and roadmap based on market analysis and user feedback.' }
-    ],
-    education: [
-        { id: safeUUID(), degree: 'Master of Business Administration (MBA)', institution: 'Stanford University', startDate: '2015', endDate: '2017' }
-    ],
-    skills: 'Product Management, Agile Methodologies, JIRA, Roadmapping, User Research, A/B Testing, Data Analysis',
+/**
+ * A new resume starts empty rather than with someone else's sample content.
+ * Name and email are pre-filled from the signed-in account when available.
+ */
+const buildBlankResume = (): ResumeData => {
+    const user = (window as any).Clerk?.user;
+    return {
+        personalDetails: {
+            fullName: user?.fullName || '',
+            jobTitle: '',
+            email: user?.primaryEmailAddress?.emailAddress || '',
+            phone: '',
+            location: '',
+            links: [],
+        },
+        summary: '',
+        experience: [],
+        education: [],
+        skills: '',
+        projects: [],
+        accomplishments: [],
+        sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
+        accentColor: '#1B1B1B',
+        customization: { fontFamily: 'inter', fontSize: 'medium', layout: 'standard' },
+    };
 };
 
 const buildStarterResumeData = (starterKey: string | null): ResumeData | null => {
@@ -546,11 +553,11 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const starterResumeData = buildStarterResumeData(starterKey);
             // Guest migration: if user tried without signup, carry their work over
             const guest = !starterResumeData ? loadGuestData() : null;
-            const baseData = starterResumeData || guest?.resumeData || initialResumeData;
+            const baseData = starterResumeData || guest?.resumeData || buildBlankResume();
             // A template picked on the landing page wins over the current one
             const pickedTemplate = localStorage.getItem('starter_template') as TemplateID | null;
             const validTemplates: TemplateID[] = ['professional-it', 'ats-modern', 'standard-classic', 'tech-minimalist', 'clean-serif'];
-            const baseTemplate = (pickedTemplate && validTemplates.includes(pickedTemplate) ? pickedTemplate : null) ?? guest?.template ?? template;
+            const baseTemplate = (pickedTemplate && validTemplates.includes(pickedTemplate) ? pickedTemplate : null) ?? guest?.template ?? 'clean-serif';
             const baseTitle = starterTitle || guest?.title || 'Untitled Resume';
             const wasFirstResume = stateRef.current.resumeHistory.length === 0;
             const payload = {

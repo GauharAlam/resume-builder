@@ -91,8 +91,8 @@ const BLUE_SAMPLE: ResumeData = { ...SAMPLE_RESUME, accentColor: BLUE };
 
 const STEPS = [
   {
-    title: "Add your details",
-    body: "Fill in the builder section by section, start from a role-based example, or import your LinkedIn profile.",
+    title: "Bring your details",
+    body: "Upload the resume you already have and we'll sort it into sections, import your LinkedIn profile, or fill in the builder from scratch.",
   },
   {
     title: "Sharpen it with AI",
@@ -100,7 +100,7 @@ const STEPS = [
   },
   {
     title: "Export and apply",
-    body: "Download a clean PDF or DOCX, or share a public link. Your work saves automatically as you go.",
+    body: "Download a text-based PDF that hiring software can read, an editable Word file, or share a public link.",
   },
 ];
 
@@ -111,6 +111,10 @@ const STARTERS = [
 ];
 
 const FAQS = [
+  {
+    q: "Can I use the resume I already have?",
+    a: "Yes. Upload a PDF or Word file, or paste the text, and it is sorted into sections for you to review. Nothing is added or invented along the way.",
+  },
   {
     q: "Do I need an account?",
     a: "Yes. A free account keeps your resumes saved and lets you pick up where you left off on any device. Signing up takes a few seconds.",
@@ -125,7 +129,7 @@ const FAQS = [
   },
   {
     q: "Which formats can I export?",
-    a: "You can download your resume as a PDF or a DOCX file from the editor.",
+    a: "PDF and Word (DOCX). The PDF contains real, selectable text rather than a picture of the page, so applicant tracking systems can read it.",
   },
   {
     q: "Are the templates ATS-friendly?",
@@ -377,7 +381,7 @@ const LandingPage: React.FC = () => {
             className="animate-fade-rise mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-[#5B6270]"
             style={{ animationDelay: "400ms" }}
           >
-            {["ATS-friendly templates", "PDF and DOCX export", "No design skills needed"].map((item) => (
+            {["Upload your existing resume", "ATS-readable PDF and DOCX", "No design skills needed"].map((item) => (
               <li key={item} className="flex items-center gap-1.5">
                 <Check className="h-4 w-4 text-[#16A34A]" strokeWidth={2.5} />
                 {item}

@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Loader2,
   Maximize2,
+  FileText,
   Minimize2,
   X,
   PanelLeft,
@@ -17,21 +18,20 @@ import {
 import { useResume } from "@/hooks";
 import { generateDocx } from "@/utils/docxExport";
 import { toastSuccess, toastError, toastInfo } from "@/utils/toast";
+import { canPrint, printResume } from "@/utils/printResume";
+import { ensurePdfLibraries, exportElementToPdf } from "@/utils/pdfExport";
+import { isResumeBlank } from "@/utils/resumeImport";
 import { trackEvent } from "@/services/analytics";
-import { FontFamily } from "@/types";
 import { ResumeTemplate, getTemplateOption, TemplateInteraction } from "@/components/templates";
 import { useEditorAI } from "./EditorAI";
 import type { BuilderSection } from "./BuilderPanel";
-import { ACCENT_SWATCHES, FONT_OPTIONS, IconButton, cx, isHexColor, useDismiss } from "./ui";
+import { IconButton, cx, useDismiss } from "./ui";
 
-declare global {
-  interface Window {
-    jspdf: any;
-    html2canvas: any;
-  }
-}
-
-export type ExportFormat = "pdf" | "docx";
+/**
+ * "pdf" opens the print dialog and yields a real text PDF.
+ * "pdf-image" saves a picture of the page (fallback where printing isn't possible).
+ */
+export type ExportFormat = "pdf" | "pdf-image" | "docx";
 
 export interface CanvasHandle {
   exportAs: (format: ExportFormat) => Promise<void>;
@@ -51,9 +51,6 @@ const TONES: { label: string; instruction: string }[] = [
 
 const CLARITY_INSTRUCTION =
   "Improve clarity only: make it easier to read, remove jargon and filler, fix grammar. Keep the same facts and a similar or shorter length.";
-
-const sanitizeFilename = (name: string): string =>
-  (name || "Resume").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 80) || "Resume";
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -209,8 +206,7 @@ const Canvas = forwardRef<
     onExportingChange: (format: ExportFormat | null) => void;
   }
 >(({ jobDescription, onJobDescriptionChange, onOpenSection, onExportingChange }, ref) => {
-  const { resumeData, updateResumeData, updateField, updateExperience, updateProject, template, setTemplate, activeResumeId } =
-    useResume();
+  const { resumeData, updateField, updateExperience, updateProject, template, setTemplate, activeResumeId } = useResume();
   const { busyId, improve } = useEditorAI();
   const option = getTemplateOption(template);
 
@@ -223,8 +219,6 @@ const Canvas = forwardRef<
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [pages, setPages] = useState(1);
-  const [colorOpen, setColorOpen] = useState(false);
-  const [hexDraft, setHexDraft] = useState(resumeData.accentColor || "");
   const [hintDismissed, setHintDismissed] = useState(() => {
     try {
       return sessionStorage.getItem(HINT_KEY) === "1";
@@ -232,7 +226,6 @@ const Canvas = forwardRef<
       return false;
     }
   });
-  const colorRef = useDismiss<HTMLDivElement>(colorOpen, () => setColorOpen(false));
 
   const fitZoom = Math.min(1, Math.max(0.3, (containerWidth - 48) / PAGE_WIDTH));
   // "Expand": fill the panel width, and always end up clearly larger than "fit"
@@ -240,7 +233,7 @@ const Canvas = forwardRef<
   const wideZoom = Math.min(1.5, Math.max((containerWidth - 48) / PAGE_WIDTH, fitZoom * 1.2, 1));
   const displayZoom = zoomMode === "fit" ? fitZoom : zoomMode === "wide" ? wideZoom : zoomMode;
   // Capture always happens at 100% so the exported file is not scaled
-  const zoom = exporting === "pdf" ? 1 : displayZoom;
+  const zoom = exporting === "pdf-image" ? 1 : displayZoom;
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -259,8 +252,6 @@ const Canvas = forwardRef<
     measure();
     return () => observer.disconnect();
   }, [template]);
-
-  useEffect(() => setHexDraft(resumeData.accentColor || ""), [resumeData.accentColor]);
 
   /* Selected block → the resume field it edits */
   const resolveBlock = useCallback(
@@ -374,58 +365,42 @@ const Canvas = forwardRef<
 
   const exportAs = async (format: ExportFormat) => {
     if (exportingRef.current) return;
-    const fileName = sanitizeFilename(resumeData.personalDetails.fullName);
-
-    if (format === "pdf" && (!window.jspdf?.jsPDF || !window.html2canvas)) {
-      toastError("The PDF library didn't load (ad-blocker or offline). Try DOCX instead.");
-      return;
-    }
+    const fileName = resumeData.personalDetails.fullName || "Resume";
+    // Without a print dialog (some in-app browsers) fall back to the image PDF
+    const effective: ExportFormat = format === "pdf" && !canPrint() ? "pdf-image" : format;
 
     exportingRef.current = true;
     (document.activeElement as HTMLElement | null)?.blur?.();
     setSelected(null);
-    setExporting(format);
-    onExportingChange(format);
+    setExporting(effective);
+    onExportingChange(effective);
     try {
-      if (format === "docx") {
+      if (effective === "docx") {
         await generateDocx(resumeData);
         markExported("docx");
         toastSuccess("DOCX downloaded.");
-        return;
+      } else if (effective === "pdf") {
+        toastInfo("In the print window, choose “Save as PDF” as the destination.");
+        await printResume({ template, data: resumeData, title: fileName });
+        markExported("pdf");
+      } else {
+        if (!(await ensurePdfLibraries())) {
+          toastError("The PDF tools couldn't be loaded (offline or blocked). Try DOCX instead.");
+          return;
+        }
+        toastInfo("Generating PDF…");
+        // Let React re-render the page at 100% with no selection chrome
+        await nextFrame();
+        await nextFrame();
+        if (document.fonts?.ready) await document.fonts.ready;
+        if (!paperRef.current) throw new Error("Preview is not mounted");
+        await exportElementToPdf(paperRef.current, fileName);
+        markExported("pdf-image");
+        toastSuccess("PDF downloaded.");
       }
-
-      toastInfo("Generating PDF…");
-      // Let React re-render the page at 100% with no selection chrome
-      await nextFrame();
-      await nextFrame();
-      if (document.fonts?.ready) await document.fonts.ready;
-      if (!paperRef.current) throw new Error("Preview is not mounted");
-
-      const { jsPDF } = window.jspdf;
-      const canvas = await window.html2canvas(paperRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const renderedHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      let heightLeft = renderedHeight;
-      let position = 0;
-      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, renderedHeight);
-      heightLeft -= pdfHeight;
-      // 1mm tolerance so a hairline of overflow doesn't add a blank page
-      while (heightLeft > 1) {
-        position -= pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, renderedHeight);
-        heightLeft -= pdfHeight;
-      }
-      pdf.save(`${fileName}.pdf`);
-      markExported("pdf");
-      toastSuccess("PDF downloaded.");
     } catch (err) {
-      console.error(`${format} export failed:`, err);
-      toastError(format === "pdf" ? "PDF export failed. Try DOCX instead." : "DOCX export failed. Please try again.");
+      console.error(`${effective} export failed:`, err);
+      toastError(effective === "docx" ? "DOCX export failed. Please try again." : "PDF export failed. Try DOCX instead.");
     } finally {
       exportingRef.current = false;
       setExporting(null);
@@ -436,10 +411,6 @@ const Canvas = forwardRef<
   useImperativeHandle(ref, () => ({ exportAs }));
 
   /* Toolbar handlers */
-  const customization = resumeData.customization || { fontFamily: "sans" as FontFamily, fontSize: "medium" as const, layout: "standard" as const };
-  const textScale = customization.textScale ?? 1;
-  const setTextScale = (value: number) =>
-    updateResumeData({ customization: { ...customization, textScale: Math.round(Math.min(1.5, Math.max(0.6, value)) * 100) / 100 } });
   const stepZoom = (direction: 1 | -1) => {
     const idx = ZOOM_STEPS.findIndex((z) => z >= displayZoom - 0.001);
     const base = idx === -1 ? ZOOM_STEPS.length - 1 : idx;
@@ -448,7 +419,6 @@ const Canvas = forwardRef<
     setZoomMode(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, next))]);
   };
 
-  const fontValue = FONT_OPTIONS.some((f) => f.id === customization.fontFamily) ? customization.fontFamily : "sans";
   const divider = <span className="mx-1 hidden h-5 w-px bg-[#E3E5EA] sm:block" />;
 
   return (
@@ -457,83 +427,9 @@ const Canvas = forwardRef<
       className="relative h-full min-h-0 w-full overflow-auto"
       onClick={() => setSelected(null)}
     >
-      {/* Floating format toolbar */}
+      {/* Floating view toolbar: zoom and page count (design controls live in the right panel) */}
       <div className="sticky top-0 z-30 flex justify-center px-2 pb-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl border border-[#E9EAEE] bg-white px-2 py-1.5 shadow-[0_6px_24px_rgba(16,24,40,0.08)]">
-          <select
-            aria-label="Font family"
-            value={fontValue}
-            onChange={(e) => updateResumeData({ customization: { ...customization, fontFamily: e.target.value as FontFamily } })}
-            className="h-8 cursor-pointer rounded-lg border border-[#E3E5EA] bg-white px-2 text-[13px] font-medium text-[#14161A] focus:border-[#2B5FD9] focus:outline-none"
-          >
-            {FONT_OPTIONS.map((font) => (
-              <option key={font.id} value={font.id}>
-                {font.name}
-              </option>
-            ))}
-          </select>
-
-          {divider}
-
-          <IconButton label="Decrease text size" disabled={textScale <= 0.6} onClick={() => setTextScale(textScale - 0.05)}>
-            <span className="text-[13px] font-semibold">A−</span>
-          </IconButton>
-          <span className="w-10 text-center text-[13px] font-medium tabular-nums text-[#14161A]" title="Text size">
-            {Math.round(textScale * 100)}%
-          </span>
-          <IconButton label="Increase text size" disabled={textScale >= 1.5} onClick={() => setTextScale(textScale + 0.05)}>
-            <span className="text-[13px] font-semibold">A+</span>
-          </IconButton>
-
-          {divider}
-
-          <div ref={colorRef} className="relative">
-            <button
-              type="button"
-              disabled={!option.supportsAccent}
-              onClick={() => setColorOpen((prev) => !prev)}
-              aria-label="Accent color"
-              title={option.supportsAccent ? "Accent color" : `${option.name} doesn't use an accent color`}
-              className="flex h-8 items-center gap-1 rounded-lg px-1.5 hover:bg-[#F0F1F4] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="h-5 w-5 rounded-md border border-black/10" style={{ background: resumeData.accentColor || "#1B1B1B" }} />
-              <ChevronDown size={14} className="text-[#3F4551]" />
-            </button>
-            {colorOpen && (
-              <div className="absolute left-1/2 top-full z-40 mt-2 w-[196px] -translate-x-1/2 rounded-xl border border-[#E9EAEE] bg-white p-3 shadow-[0_8px_28px_rgba(16,24,40,0.14)]">
-                <div className="grid grid-cols-4 gap-2">
-                  {ACCENT_SWATCHES.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      aria-label={`Use ${color}`}
-                      onClick={() => updateResumeData({ accentColor: color })}
-                      className={cx(
-                        "h-9 w-9 rounded-lg border border-black/10",
-                        (resumeData.accentColor || "").toLowerCase() === color.toLowerCase() && "ring-2 ring-[#2B5FD9] ring-offset-2",
-                      )}
-                      style={{ background: color }}
-                    />
-                  ))}
-                </div>
-                <input
-                  aria-label="Hex color"
-                  value={hexDraft}
-                  maxLength={7}
-                  onChange={(e) => {
-                    const value = e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`;
-                    setHexDraft(value);
-                    if (isHexColor(value)) updateResumeData({ accentColor: value });
-                  }}
-                  onBlur={() => setHexDraft(resumeData.accentColor || "")}
-                  className="mt-3 w-full rounded-lg border border-[#E3E5EA] px-2.5 py-1.5 text-[13px] uppercase text-[#14161A] focus:border-[#2B5FD9] focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
-
-          {divider}
-
           <IconButton label="Zoom out" disabled={displayZoom <= ZOOM_STEPS[0] + 0.001} onClick={() => stepZoom(-1)}>
             <Minus size={15} />
           </IconButton>
@@ -598,6 +494,17 @@ const Canvas = forwardRef<
             style={{ width: PAGE_WIDTH, minHeight: PAGE_HEIGHT }}
           >
             <ResumeTemplate template={template} data={resumeData} interaction={interaction} />
+            {isResumeBlank(resumeData) && (
+              <div data-html2canvas-ignore="true" className="pointer-events-none absolute inset-x-0 top-[260px] flex flex-col items-center px-10 text-center font-inter">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF3FF] text-[#2B5FD9]">
+                  <FileText size={22} />
+                </span>
+                <p className="mt-4 text-[17px] font-medium text-[#14161A]">Your resume will take shape here</p>
+                <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-[#6B7280]">
+                  Fill in the sections in the builder, and everything you type appears on this page straight away.
+                </p>
+              </div>
+            )}
             {/* Page-break guides (never exported) */}
             {Array.from({ length: pages - 1 }, (_, i) => (
               <div

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ResumeData } from '@/types';
+import { ResumeData, SectionId } from '@/types';
+import { dateRange, displayUrl, safeUrl, splitSkills, stripBullet, toLines, visibleSections } from './shared';
 
 // Optional on-canvas editing hooks. When omitted (public page, exports,
 // thumbnails) the template renders as plain static markup.
@@ -9,17 +10,6 @@ export interface TemplateInteraction {
   onEdit: (blockId: string, text: string) => void;
   renderActions?: (blockId: string) => React.ReactNode;
 }
-
-const stripBullet = (line: string) => line.replace(/^\s*[•\-*–]\s*/, '').trim();
-
-export const toLines = (text: string | undefined) =>
-  (text || '')
-    .replace(/<\/(li|p)>|<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .split('\n')
-    .map(stripBullet)
-    .filter(Boolean);
 
 const Handle: React.FC<{ className: string }> = ({ className }) => (
   <span className={`absolute w-[7px] h-[7px] rounded-full bg-white border border-[#2B5FD9] ${className}`} />
@@ -114,7 +104,7 @@ const Block: React.FC<{
 };
 
 const Heading: React.FC<{ children: React.ReactNode; color: string }> = ({ children, color }) => (
-  <h3 className="text-[1.1em] font-semibold mb-[0.9em]" style={{ color }}>
+  <h3 className="text-[1.1em] font-semibold mb-[0.9em] break-after-avoid" style={{ color }}>
     {children}
   </h3>
 );
@@ -129,14 +119,113 @@ const CleanSerifTemplate: React.FC<{
   const education = data.education || [];
   const projects = data.projects || [];
   const accomplishments = (data.accomplishments || []).filter((a) => stripBullet(a.description || ''));
+  const skillList = splitSkills(data.skills);
 
   const fontClass = customization?.fontFamily ? `font-${customization.fontFamily}` : 'font-inter';
   const ink = accentColor || '#1B1B1B';
   const spacing = customization?.layout === 'compact' ? 0.75 : customization?.layout === 'spacious' ? 1.3 : 1;
-  const skillList = (data.skills || '')
-    .split(/[,\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+
+  const skillsSection = (columns: number) => (
+    <section className="break-inside-avoid">
+      <Heading color={ink}>Skills</Heading>
+      <ul className="list-disc ml-[1.5em] text-[0.88em]" style={{ columns, columnGap: '3em' }}>
+        {skillList.map((skill, i) => (
+          <li key={i} className="mb-[0.45em]" style={{ breakInside: 'avoid' }}>
+            {skill}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+
+  const accomplishmentsSection = (
+    <section className="break-inside-avoid">
+      <Heading color={ink}>Certifications &amp; Awards</Heading>
+      <ul className="list-disc ml-[1.5em] text-[0.88em] space-y-[0.45em]">
+        {accomplishments.map((acc) => (
+          <li key={acc.id}>{toLines(acc.description).join(' ')}</li>
+        ))}
+      </ul>
+    </section>
+  );
+
+  const sections: Record<SectionId, React.ReactNode> = {
+    summary: toLines(summary).length > 0 && <Block id="summary" interaction={interaction} as="paragraph" text={summary} />,
+    experience: experience.length > 0 && (
+      <section>
+        <Heading color={ink}>Experience</Heading>
+        <div className="flex flex-col" style={{ gap: `${1.4 * spacing}em` }}>
+          {experience.map((exp) => (
+            <div key={exp.id} className="break-inside-avoid">
+              <div className="text-[0.72em] uppercase tracking-wide text-[#6B7280]">{dateRange(exp.startDate, exp.endDate)}</div>
+              <div className="mt-[0.2em] text-[1.05em]">
+                <span className="font-bold">{exp.jobTitle || 'Job title'}</span>
+                {exp.company && <span> @ {exp.company}</span>}
+              </div>
+              {toLines(exp.description).length > 0 && (
+                <Block id={`exp:${exp.id}`} interaction={interaction} as="bullets" text={exp.description} className="mt-[0.8em] text-[0.88em]" />
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    ),
+    projects: projects.length > 0 && (
+      <section>
+        <Heading color={ink}>Projects</Heading>
+        <div className="flex flex-col" style={{ gap: `${1.4 * spacing}em` }}>
+          {projects.map((proj) => (
+            <div key={proj.id} className="break-inside-avoid">
+              <div className="text-[1.05em]">
+                <span className="font-bold">{proj.name || 'Project name'}</span>
+                {safeUrl(proj.url) && <span className="text-[0.82em] text-[#6B7280] break-all"> — {displayUrl(proj.url)}</span>}
+              </div>
+              {toLines(proj.description).length > 0 && (
+                <Block id={`proj:${proj.id}`} interaction={interaction} as="bullets" text={proj.description} className="mt-[0.6em] text-[0.88em]" />
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    ),
+    education: education.length > 0 && (
+      <section>
+        <Heading color={ink}>Education</Heading>
+        <div className="flex flex-col" style={{ gap: `${1.1 * spacing}em` }}>
+          {education.map((edu) => (
+            <div key={edu.id} className="break-inside-avoid">
+              <div className="text-[0.72em] uppercase tracking-wide text-[#6B7280]">{dateRange(edu.startDate, edu.endDate)}</div>
+              <div className="mt-[0.2em] text-[1.05em]">
+                <span className="font-bold">{edu.degree || 'Degree'}</span>
+                {edu.institution && <span> @ {edu.institution}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    ),
+    skills: skillList.length > 0 && skillsSection(2),
+    accomplishments: accomplishments.length > 0 && accomplishmentsSection,
+  };
+
+  // Skills and certifications sit side by side when they are neighbours
+  const order = visibleSections(data).filter((id) => Boolean(sections[id]));
+  const rendered: React.ReactNode[] = [];
+  for (let i = 0; i < order.length; i++) {
+    const pair = [order[i], order[i + 1]];
+    if (pair.includes('skills') && pair.includes('accomplishments')) {
+      rendered.push(
+        <div key="skills-accomplishments" className="grid grid-cols-2 gap-x-10 break-inside-avoid">
+          {pair.map((id) => (
+            <React.Fragment key={id}>{id === 'skills' ? skillsSection(1) : accomplishmentsSection}</React.Fragment>
+          ))}
+        </div>,
+      );
+      i++;
+    } else {
+      rendered.push(<React.Fragment key={order[i]}>{sections[order[i]]}</React.Fragment>);
+    }
+  }
 
   return (
     <div
@@ -163,16 +252,10 @@ const CleanSerifTemplate: React.FC<{
         </div>
         <div className="flex flex-col items-end text-[0.85em] leading-[2] shrink-0 max-w-[45%] text-right break-all">
           {(personalDetails.links || [])
-            .filter((l) => l.url?.trim())
+            .filter((link) => safeUrl(link.url))
             .map((link) => (
-              <a
-                key={link.id}
-                href={/^https?:\/\//.test(link.url) ? link.url : `https://${link.url}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
-                {link.url.replace(/^https?:\/\//, '')}
+              <a key={link.id} href={safeUrl(link.url)} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                {displayUrl(link.url)}
               </a>
             ))}
           {personalDetails.email && (
@@ -185,116 +268,7 @@ const CleanSerifTemplate: React.FC<{
         </div>
       </header>
 
-      {/* Summary */}
-      {toLines(summary).length > 0 && <Block id="summary" interaction={interaction} as="paragraph" text={summary} />}
-
-      {/* Experience */}
-      {experience.length > 0 && (
-        <section>
-          <Heading color={ink}>Experience</Heading>
-          <div className="flex flex-col" style={{ gap: `${1.4 * spacing}em` }}>
-            {experience.map((exp) => (
-              <div key={exp.id}>
-                <div className="text-[0.72em] uppercase tracking-wide text-[#6B7280]">
-                  {[exp.startDate, exp.endDate].filter(Boolean).join(' - ')}
-                </div>
-                <div className="mt-[0.2em] text-[1.05em]">
-                  <span className="font-bold">{exp.jobTitle || 'Job title'}</span>
-                  {exp.company && <span> @ {exp.company}</span>}
-                </div>
-                {toLines(exp.description).length > 0 && (
-                  <Block
-                    id={`exp:${exp.id}`}
-                    interaction={interaction}
-                    as="bullets"
-                    text={exp.description}
-                    className="mt-[0.8em] text-[0.88em]"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Projects */}
-      {projects.length > 0 && (
-        <section>
-          <Heading color={ink}>Projects</Heading>
-          <div className="flex flex-col" style={{ gap: `${1.4 * spacing}em` }}>
-            {projects.map((proj) => (
-              <div key={proj.id}>
-                <div className="text-[1.05em]">
-                  <span className="font-bold">{proj.name || 'Project name'}</span>
-                  {proj.url && (
-                    <span className="text-[0.82em] text-[#6B7280] break-all"> — {proj.url.replace(/^https?:\/\//, '')}</span>
-                  )}
-                </div>
-                {toLines(proj.description).length > 0 && (
-                  <Block
-                    id={`proj:${proj.id}`}
-                    interaction={interaction}
-                    as="bullets"
-                    text={proj.description}
-                    className="mt-[0.6em] text-[0.88em]"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Education */}
-      {education.length > 0 && (
-        <section>
-          <Heading color={ink}>Education</Heading>
-          <div className="flex flex-col" style={{ gap: `${1.1 * spacing}em` }}>
-            {education.map((edu) => (
-              <div key={edu.id}>
-                <div className="text-[0.72em] uppercase tracking-wide text-[#6B7280]">
-                  {[edu.startDate, edu.endDate].filter(Boolean).join(' - ')}
-                </div>
-                <div className="mt-[0.2em] text-[1.05em]">
-                  <span className="font-bold">{edu.degree || 'Degree'}</span>
-                  {edu.institution && <span> @ {edu.institution}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Skills + Certifications */}
-      {(skillList.length > 0 || accomplishments.length > 0) && (
-        <div className="grid grid-cols-2 gap-x-10">
-          {skillList.length > 0 && (
-            <section className={accomplishments.length > 0 ? '' : 'col-span-2'}>
-              <Heading color={ink}>Skills</Heading>
-              <ul
-                className="list-disc ml-[1.5em] text-[0.88em]"
-                style={{ columns: accomplishments.length > 0 ? 1 : 2, columnGap: '3em' }}
-              >
-                {skillList.map((skill, i) => (
-                  <li key={i} className="mb-[0.45em]" style={{ breakInside: 'avoid' }}>
-                    {skill}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {accomplishments.length > 0 && (
-            <section className={skillList.length > 0 ? '' : 'col-span-2'}>
-              <Heading color={ink}>Certifications &amp; Awards</Heading>
-              <ul className="list-disc ml-[1.5em] text-[0.88em] space-y-[0.45em]">
-                {accomplishments.map((acc) => (
-                  <li key={acc.id}>{stripBullet(acc.description || '')}</li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
-      )}
+      {rendered}
     </div>
   );
 };

@@ -20,6 +20,9 @@ import {
   Mail,
   Linkedin,
   Pencil,
+  FileUp,
+  Image as ImageIcon,
+  FileType,
 } from "lucide-react";
 import { useResume } from "@/hooks";
 import { useAuth } from "@/context";
@@ -53,8 +56,9 @@ export const TopNav: React.FC<{
   onOpenAnalyze: (tab: AnalyzeTab) => void;
   onOpenGenerate: () => void;
   onOpenImport: () => void;
+  onOpenUpload: () => void;
   onShowTemplates: () => void;
-}> = ({ onOpenAnalyze, onOpenGenerate, onOpenImport, onShowTemplates }) => {
+}> = ({ onOpenAnalyze, onOpenGenerate, onOpenImport, onOpenUpload, onShowTemplates }) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { user } = useUser();
@@ -100,11 +104,13 @@ export const TopNav: React.FC<{
           </button>
           {toolsOpen && (
             <div role="menu" className="absolute left-1/2 top-full z-50 mt-1.5 w-60 -translate-x-1/2 rounded-xl border border-[#E9EAEE] bg-white p-1.5 shadow-[0_12px_32px_rgba(16,24,40,0.12)]">
-              <MenuItem icon={<Wand2 size={16} />} onClick={() => runTool(onOpenGenerate)}>Generate resume with AI</MenuItem>
+              <MenuItem icon={<FileUp size={16} />} onClick={() => runTool(onOpenUpload)}>Upload existing resume</MenuItem>
+              <MenuItem icon={<Linkedin size={16} />} onClick={() => runTool(onOpenImport)}>Import from LinkedIn</MenuItem>
+              <MenuItem icon={<Wand2 size={16} />} onClick={() => runTool(onOpenGenerate)}>Draft resume with AI</MenuItem>
+              <div className="my-1 h-px bg-[#E9EAEE]" />
               <MenuItem icon={<Gauge size={16} />} onClick={() => runTool(() => onOpenAnalyze("ats"))}>ATS score</MenuItem>
               <MenuItem icon={<Crosshair size={16} />} onClick={() => runTool(() => onOpenAnalyze("jd"))}>Job description match</MenuItem>
               <MenuItem icon={<Mail size={16} />} onClick={() => runTool(() => onOpenAnalyze("cover"))}>Cover letter</MenuItem>
-              <MenuItem icon={<Linkedin size={16} />} onClick={() => runTool(onOpenImport)}>Import from LinkedIn</MenuItem>
             </div>
           )}
         </div>
@@ -271,8 +277,14 @@ export const DocumentBar: React.FC<{
             <span className="hidden xl:inline">{exporting ? "Exporting…" : "Download"}</span>
           </SecondaryButton>
           {downloadOpen && (
-            <div role="menu" className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-xl border border-[#E9EAEE] bg-white p-1.5 shadow-[0_12px_32px_rgba(16,24,40,0.12)]">
-              {(["pdf", "docx"] as ExportFormat[]).map((format) => (
+            <div role="menu" className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-[#E9EAEE] bg-white p-1.5 shadow-[0_12px_32px_rgba(16,24,40,0.12)]">
+              {(
+                [
+                  { format: "pdf", icon: <FileText size={16} />, label: "PDF", note: "Recommended · real text, ATS-readable" },
+                  { format: "docx", icon: <FileType size={16} />, label: "Word (DOCX)", note: "Editable document" },
+                  { format: "pdf-image", icon: <ImageIcon size={16} />, label: "PDF as image", note: "Fallback · text can't be selected" },
+                ] as { format: ExportFormat; icon: React.ReactNode; label: string; note: string }[]
+              ).map(({ format, icon, label, note }) => (
                 <button
                   key={format}
                   type="button"
@@ -281,10 +293,13 @@ export const DocumentBar: React.FC<{
                     setDownloadOpen(false);
                     onExport(format);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-[#14161A] hover:bg-[#F0F1F4]"
+                  className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-[#14161A] hover:bg-[#F0F1F4]"
                 >
-                  <FileText size={16} />
-                  {format === "pdf" ? "PDF document" : "Word (DOCX)"}
+                  <span className="mt-0.5 text-[#3F4551]">{icon}</span>
+                  <span>
+                    <span className="block font-medium">{label}</span>
+                    <span className="block text-xs text-[#6B7280]">{note}</span>
+                  </span>
                 </button>
               ))}
             </div>

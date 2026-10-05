@@ -184,3 +184,28 @@ export const generateBullets = async (
   }
 };
 
+
+/** Structures the plain text of an existing resume. Throws with a user-facing message on failure. */
+export const parseResumeText = async (text: string): Promise<any> => {
+  const token = localStorage.getItem("authToken");
+  const response = await apiRequest("/ai/parse-resume", {
+    method: "POST",
+    // The backend caps input at 30,000 characters; long resumes are trimmed rather than rejected
+    body: JSON.stringify({ text: text.slice(0, 30000) }),
+    token,
+  });
+  if (!response?.success || !response.data) throw new Error("We couldn't read that resume. Please try again.");
+  return response.data;
+};
+
+/** Fetches a public LinkedIn profile through the backend. Throws with a user-facing message on failure. */
+export const importLinkedInProfile = async (url: string): Promise<any> => {
+  const token = localStorage.getItem("authToken");
+  const response = await apiRequest("/ai/import-linkedin", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+    token,
+  });
+  if (!response?.success || !response.data) throw new Error("We couldn't import that profile. Please try again.");
+  return response.data;
+};

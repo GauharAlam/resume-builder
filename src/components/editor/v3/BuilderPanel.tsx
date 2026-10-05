@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Minus, Sparkles, Loader2, Trash2, ChevronUp, ChevronDown, X, Check } from "lucide-react";
+import { Plus, Minus, Sparkles, Loader2, Trash2, ChevronUp, ChevronDown, X, Check, Eye, EyeOff } from "lucide-react";
 import { useResume } from "@/hooks";
 import { suggestSkills } from "@/services/aiService";
 import { toastError, toastInfo } from "@/utils/toast";
-import { ResumeTemplate, TEMPLATE_OPTIONS } from "@/components/templates";
+import { SectionId } from "@/types";
+import { ResumeTemplate, TEMPLATE_OPTIONS, normalizeSectionOrder, splitSkills } from "@/components/templates";
 import { useEditorAI } from "./EditorAI";
 import { Field, TextAreaField, PrimaryButton, cx } from "./ui";
 
@@ -19,24 +20,36 @@ export type BuilderSection =
 
 export type BuilderTab = "builder" | "templates";
 
-const SECTIONS: { id: BuilderSection; title: string }[] = [
-  { id: "summary", title: "Professional Summary" },
-  { id: "education", title: "Education" },
-  { id: "experience", title: "Work Experience" },
-  { id: "projects", title: "Projects" },
-  { id: "certifications", title: "Certification" },
-  { id: "contacts", title: "Contacts" },
-  { id: "links", title: "Website & Links" },
-  { id: "skills", title: "Skills" },
-];
+const TITLES: Record<BuilderSection, string> = {
+  contacts: "Contacts",
+  links: "Website & Links",
+  summary: "Professional Summary",
+  experience: "Work Experience",
+  projects: "Projects",
+  education: "Education",
+  skills: "Skills",
+  certifications: "Certification",
+};
+
+// Builder sections that appear on the page as a movable, hideable block
+const RESUME_SECTION: Partial<Record<BuilderSection, SectionId>> = {
+  summary: "summary",
+  experience: "experience",
+  projects: "projects",
+  education: "education",
+  skills: "skills",
+  certifications: "accomplishments",
+};
+const BUILDER_SECTION: Record<SectionId, BuilderSection> = {
+  summary: "summary",
+  experience: "experience",
+  projects: "projects",
+  education: "education",
+  skills: "skills",
+  accomplishments: "certifications",
+};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const splitSkills = (skills: string | undefined) =>
-  (skills || "")
-    .split(/[,\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
 
 /* ── Small building blocks ─────────────────────────────────── */
 
@@ -187,6 +200,21 @@ const BuilderPanel: React.FC<{
   const accomplishments = resumeData.accomplishments || [];
   const links = resumeData.personalDetails.links || [];
   const skills = splitSkills(resumeData.skills);
+
+  /* Section order and visibility on the page */
+  const order = normalizeSectionOrder(resumeData.sectionOrder);
+  const hidden = resumeData.hiddenSections || [];
+  // Contact details always lead the page; the rest follow the user's order
+  const sectionList: BuilderSection[] = ["contacts", "links", ...order.map((id) => BUILDER_SECTION[id])];
+
+  const moveSection = (id: SectionId, direction: -1 | 1) => {
+    const from = order.indexOf(id);
+    const to = from + direction;
+    if (to < 0 || to >= order.length) return;
+    updateField("sectionOrder", move(order, from, to));
+  };
+  const toggleHidden = (id: SectionId) =>
+    updateField("hiddenSections", hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id]);
 
   const expExpanded = useExpanded(experience.map((e) => e.id));
   const eduExpanded = useExpanded(education.map((e) => e.id));
@@ -619,31 +647,89 @@ const BuilderPanel: React.FC<{
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "builder" ? (
-          SECTIONS.map(({ id, title }) => {
+          sectionList.map((id) => {
             const isOpen = openSection === id;
+            const resumeSection = RESUME_SECTION[id];
+            const position = resumeSection ? order.indexOf(resumeSection) : -1;
+            const isHidden = resumeSection ? hidden.includes(resumeSection) : false;
             return (
               <div
                 key={id}
                 ref={(el) => {
                   sectionRefs.current[id] = el;
                 }}
-                className="border-b border-[#E9EAEE] last:border-b-0"
+                className="group/section border-b border-[#E9EAEE] last:border-b-0"
               >
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  onClick={() => onOpenSection(isOpen ? null : id)}
-                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-[#FAFAFB]"
-                >
-                  <span className="flex items-center gap-2 text-[15px] font-medium text-[#14161A]">
-                    {title}
-                    {!!counts[id] && (
+                <div className="flex items-center transition-colors hover:bg-[#FAFAFB]">
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => onOpenSection(isOpen ? null : id)}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-4 pl-5 text-left"
+                  >
+                    <span className={cx("truncate text-[15px] font-medium", isHidden ? "text-[#9AA0AB] line-through" : "text-[#14161A]")}>{TITLES[id]}</span>
+                    {!!counts[id] && !isHidden && (
                       <span className="rounded-full bg-[#F0F1F4] px-1.5 py-0.5 text-[11px] font-medium text-[#6B7280]">{counts[id]}</span>
                     )}
-                  </span>
-                  {isOpen ? <Minus size={17} className="text-[#14161A]" /> : <Plus size={17} className="text-[#14161A]" />}
-                </button>
-                {isOpen && <div className="px-5 pb-5">{renderSection(id)}</div>}
+                    {isHidden && <span className="rounded-md bg-[#F0F1F4] px-1.5 py-0.5 text-[11px] font-medium text-[#6B7280]">Hidden</span>}
+                  </button>
+                  {resumeSection && (
+                    <div className="flex items-center opacity-100 transition-opacity lg:opacity-0 lg:focus-within:opacity-100 lg:group-hover/section:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => moveSection(resumeSection, -1)}
+                        disabled={position <= 0}
+                        aria-label={`Move ${TITLES[id]} up`}
+                        title="Move up on the page"
+                        className="rounded p-1 text-[#6B7280] hover:bg-[#F0F1F4] disabled:opacity-25 disabled:hover:bg-transparent"
+                      >
+                        <ChevronUp size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveSection(resumeSection, 1)}
+                        disabled={position >= order.length - 1}
+                        aria-label={`Move ${TITLES[id]} down`}
+                        title="Move down on the page"
+                        className="rounded p-1 text-[#6B7280] hover:bg-[#F0F1F4] disabled:opacity-25 disabled:hover:bg-transparent"
+                      >
+                        <ChevronDown size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleHidden(resumeSection)}
+                        aria-pressed={isHidden}
+                        aria-label={isHidden ? `Show ${TITLES[id]} on the page` : `Hide ${TITLES[id]} from the page`}
+                        title={isHidden ? "Show on the page" : "Hide from the page (content is kept)"}
+                        className="rounded p-1 text-[#6B7280] hover:bg-[#F0F1F4]"
+                      >
+                        {isHidden ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onClick={() => onOpenSection(isOpen ? null : id)}
+                    className="py-4 pl-2 pr-5 text-[#14161A]"
+                  >
+                    {isOpen ? <Minus size={17} /> : <Plus size={17} />}
+                  </button>
+                </div>
+                {isOpen && (
+                  <div className="px-5 pb-5">
+                    {isHidden && (
+                      <p className="mb-3 rounded-lg bg-[#F6F7F9] px-3 py-2 text-xs text-[#6B7280]">
+                        This section is hidden, so it won't appear on your resume.{" "}
+                        <button type="button" onClick={() => resumeSection && toggleHidden(resumeSection)} className="font-medium text-[#2B5FD9] hover:underline">
+                          Show it
+                        </button>
+                      </p>
+                    )}
+                    {renderSection(id)}
+                  </div>
+                )}
               </div>
             );
           })

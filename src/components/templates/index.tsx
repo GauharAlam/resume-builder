@@ -7,6 +7,7 @@ import TechMinimalistTemplate from './TechMinimalistTemplate';
 import CleanSerifTemplate, { TemplateInteraction } from './CleanSerifTemplate';
 
 export type { TemplateInteraction };
+export * from './shared';
 
 export interface TemplateOption {
   id: TemplateID;

@@ -13,6 +13,9 @@ import BuilderPanel, { BuilderSection, BuilderTab } from "@/components/editor/v3
 import Canvas, { CanvasHandle, ExportFormat } from "@/components/editor/v3/Canvas";
 import InspectorPanel from "@/components/editor/v3/InspectorPanel";
 import AnalyzeDrawer, { AnalyzeTab } from "@/components/editor/v3/AnalyzeDrawer";
+import ImportResumeModal from "@/components/editor/v3/ImportResumeModal";
+import OnboardingDialog, { StartChoice } from "@/components/editor/v3/OnboardingDialog";
+import { isResumeBlank } from "@/utils/resumeImport";
 import { PrimaryButton, SecondaryButton, cx } from "@/components/editor/v3/ui";
 
 const PAGE_BG = "#F3F4F6";
@@ -22,11 +25,12 @@ type MobileTab = "build" | "preview" | "design";
 /* ── The editor UI itself (assumes a resume is loaded) ─────── */
 
 export const EditorWorkspace: React.FC = () => {
-  const { activeResumeId, manualSave } = useResume();
+  const { activeResumeId, manualSave, resumeData } = useResume();
   const canvasRef = useRef<CanvasHandle>(null);
 
   const [builderTab, setBuilderTab] = useState<BuilderTab>("builder");
-  const [openSection, setOpenSection] = useState<BuilderSection | null>("summary");
+  // A new resume opens on Contacts (top of the page); an existing one on its summary
+  const [openSection, setOpenSection] = useState<BuilderSection | null>(() => (isResumeBlank(resumeData) ? "contacts" : "summary"));
   const [mobileTab, setMobileTab] = useState<MobileTab>("build");
   const [analyzeTab, setAnalyzeTab] = useState<AnalyzeTab | null>(null);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
@@ -34,6 +38,27 @@ export const EditorWorkspace: React.FC = () => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  // Offer the "how do you want to start" choices once per empty resume
+  const onboardingKey = `editor:onboarded:${activeResumeId ?? "new"}`;
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (!isResumeBlank(resumeData)) return false;
+    try {
+      return sessionStorage.getItem(onboardingKey) !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const handleStartChoice = (choice: StartChoice) => {
+    setShowOnboarding(false);
+    try {
+      sessionStorage.setItem(onboardingKey, "1");
+    } catch {}
+    if (choice === "upload") setIsUploadOpen(true);
+    else if (choice === "linkedin") setIsImportOpen(true);
+    else if (choice === "generate") setIsGenerateOpen(true);
+  };
 
   // index.html paints the body dark for the rest of the app
   useEffect(() => {
@@ -78,7 +103,7 @@ export const EditorWorkspace: React.FC = () => {
 
   const handleExport = async (format: ExportFormat) => {
     // The page must be on screen to be captured
-    if (format === "pdf" && mobileTab !== "preview") {
+    if (format === "pdf-image" && mobileTab !== "preview") {
       setMobileTab("preview");
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     }
@@ -102,6 +127,7 @@ export const EditorWorkspace: React.FC = () => {
           onOpenAnalyze={setAnalyzeTab}
           onOpenGenerate={() => setIsGenerateOpen(true)}
           onOpenImport={() => setIsImportOpen(true)}
+          onOpenUpload={() => setIsUploadOpen(true)}
           onShowTemplates={() => {
             setBuilderTab("templates");
             setMobileTab("build");
@@ -150,10 +176,18 @@ export const EditorWorkspace: React.FC = () => {
           </div>
         </main>
 
-        <AnalyzeDrawer tab={analyzeTab} onTabChange={setAnalyzeTab} onClose={closeAnalyze} />
+        <AnalyzeDrawer
+          tab={analyzeTab}
+          onTabChange={setAnalyzeTab}
+          onClose={closeAnalyze}
+          jobDescription={jobDescription}
+          onJobDescriptionChange={setJobDescription}
+        />
         <LinkedInImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
         <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
         <AIGenerateResumeModal isOpen={isGenerateOpen} onClose={() => setIsGenerateOpen(false)} />
+        <ImportResumeModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} />
+        {showOnboarding && <OnboardingDialog onChoose={handleStartChoice} />}
       </div>
     </EditorAIProvider>
   );

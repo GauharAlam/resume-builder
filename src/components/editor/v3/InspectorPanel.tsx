@@ -4,7 +4,8 @@ import { useResume } from "@/hooks";
 import { suggestSkills } from "@/services/aiService";
 import { toastError, toastSuccess } from "@/utils/toast";
 import { FontFamily, LayoutSpacing, TemplateID } from "@/types";
-import { TEMPLATE_OPTIONS, getTemplateOption } from "@/components/templates";
+import { TEMPLATE_OPTIONS, getTemplateOption, splitSkills } from "@/components/templates";
+import { getResumeStrength, StrengthCheck } from "@/utils/resumeStrength";
 import type { BuilderSection } from "./BuilderPanel";
 import type { AnalyzeTab } from "./AnalyzeDrawer";
 import { ACCENT_SWATCHES, FONT_OPTIONS, PrimaryButton, SecondaryButton, SelectField, cx, isHexColor } from "./ui";
@@ -18,13 +19,18 @@ interface Suggestion {
   onAction: () => void;
 }
 
-const splitSkills = (skills: string | undefined) =>
-  (skills || "")
-    .split(/[,\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-const plain = (text: string | undefined) => (text || "").replace(/<[^>]*>/g, "").trim();
+// Short titles and explanations for each completeness check
+const CHECK_COPY: Record<string, { title: string; body: string; action: string }> = {
+  contact: { title: "Contact Details", body: "Your name, email or phone number is missing. Recruiters need these to reach you.", action: "Add details" },
+  title: { title: "Job Title", body: "Add the job title you're known by or aiming for. It sits right under your name.", action: "Add title" },
+  summary: { title: "Professional Summary", body: "A 2–4 sentence summary at the top helps recruiters place you in seconds.", action: "Write summary" },
+  experience: { title: "Work Experience", body: "Add at least one role. Internships, freelance and volunteer work all count.", action: "Add a role" },
+  bullets: { title: "Describe Your Work", body: "Add three or more bullet points about what you did and what came of it.", action: "Add bullets" },
+  metrics: { title: "Quantify Impact", body: "None of your bullets include a number. Add a metric, percentage or scale where you truthfully can.", action: "Edit bullets" },
+  education: { title: "Education", body: "Add your highest or most relevant qualification.", action: "Add education" },
+  skills: { title: "Skills", body: "List at least five skills so keyword searches can find you.", action: "Add skills" },
+  links: { title: "Portfolio Link", body: "Add a portfolio, LinkedIn or GitHub link to back up your experience.", action: "Add link" },
+};
 
 const Stepper: React.FC<{
   label: string;
@@ -103,15 +109,24 @@ const InspectorPanel: React.FC<{
     }
   };
 
+  const strength = useMemo(() => getResumeStrength(resumeData), [resumeData]);
+
   const suggestions = useMemo<Suggestion[]>(() => {
     const list: Suggestion[] = [];
-    const experience = resumeData.experience || [];
-    const bullets = experience.flatMap((e) => plain(e.description).split("\n").filter((l) => l.trim()));
-    const details = resumeData.personalDetails;
+
+    // Essentials first, most valuable gap first
+    strength.checks
+      .filter((check: StrengthCheck) => !check.done)
+      .sort((a, b) => b.weight - a.weight)
+      .forEach((check) => {
+        const copy = CHECK_COPY[check.id];
+        if (!copy) return;
+        list.push({ id: check.id, title: copy.title, body: copy.body, actionLabel: copy.action, onAction: () => onOpenSection(check.section) });
+      });
 
     if (foundSkills === null) {
       list.push({
-        id: "skills",
+        id: "skill-scan",
         title: "Skill Alignment",
         body: "Scan your experience for skills you haven't listed yet.",
         actionLabel: scanning ? "Scanning…" : "Scan skills",
@@ -120,7 +135,7 @@ const InspectorPanel: React.FC<{
       });
     } else if (foundSkills.length > 0) {
       list.push({
-        id: "skills",
+        id: "skill-scan",
         title: "Skill Alignment",
         body: `${foundSkills.length} ${foundSkills.length === 1 ? "skill" : "skills"} found in your profile that ${foundSkills.length === 1 ? "is" : "are"} not listed here: ${foundSkills.slice(0, 4).join(", ")}${foundSkills.length > 4 ? "…" : ""}`,
         actionLabel: "Add skills",
@@ -132,50 +147,6 @@ const InspectorPanel: React.FC<{
       });
     }
 
-    if (!details.fullName?.trim() || !details.email?.trim() || !details.phone?.trim()) {
-      list.push({
-        id: "contacts",
-        title: "Contact Details",
-        body: "Your name, email or phone number is missing. Recruiters need these to reach you.",
-        actionLabel: "Add details",
-        onAction: () => onOpenSection("contacts"),
-      });
-    }
-    if (plain(resumeData.summary).length < 60) {
-      list.push({
-        id: "summary",
-        title: "Professional Summary",
-        body: "A 2–4 sentence summary at the top helps recruiters place you in seconds.",
-        actionLabel: "Write summary",
-        onAction: () => onOpenSection("summary"),
-      });
-    }
-    if (experience.length === 0 || bullets.length < 2) {
-      list.push({
-        id: "experience",
-        title: "Work Experience",
-        body: "Add at least two bullet points describing what you achieved in your roles.",
-        actionLabel: "Add experience",
-        onAction: () => onOpenSection("experience"),
-      });
-    } else if (!bullets.some((b) => /\d/.test(b))) {
-      list.push({
-        id: "metrics",
-        title: "Quantify Impact",
-        body: "None of your bullets include a number. Add a metric, percentage or scale where you can.",
-        actionLabel: "Edit bullets",
-        onAction: () => onOpenSection("experience"),
-      });
-    }
-    if ((details.links || []).filter((l) => l.url?.trim()).length === 0) {
-      list.push({
-        id: "links",
-        title: "Portfolio Link",
-        body: "No links yet. Add a portfolio, LinkedIn or GitHub profile to back up your experience.",
-        actionLabel: "Add link",
-        onAction: () => onOpenSection("links"),
-      });
-    }
     list.push({
       id: "jd",
       title: "Job Match",
@@ -186,7 +157,7 @@ const InspectorPanel: React.FC<{
 
     return list.filter((s) => !dismissed.includes(s.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resumeData, foundSkills, scanning, dismissed]);
+  }, [strength, foundSkills, scanning, dismissed]);
 
   const safeIndex = Math.min(index, Math.max(0, suggestions.length - 1));
   const current = suggestions[safeIndex];
@@ -210,6 +181,30 @@ const InspectorPanel: React.FC<{
         className="shrink-0 overflow-hidden rounded-2xl border border-[#E4EAFB] p-5"
         style={{ background: "linear-gradient(160deg, #F7F9FF 0%, #E9EFFD 100%)" }}
       >
+        <div className="mb-4 flex items-center gap-3 border-b border-[#D9E2F8] pb-4">
+          <div className="relative h-12 w-12 shrink-0">
+            <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#D9E2F8" strokeWidth="3.5" />
+              <circle
+                cx="18"
+                cy="18"
+                r="15"
+                fill="none"
+                stroke={strength.score >= 80 ? "#16A34A" : strength.score >= 50 ? "#2B5FD9" : "#D97706"}
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeDasharray={`${(strength.score / 100) * 94.25} 94.25`}
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[13px] font-semibold tabular-nums">{strength.score}</span>
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-[#14161A]">Resume strength</div>
+            <div className="text-xs text-[#6B7280]">
+              {strength.checks.filter((c) => c.done).length} of {strength.checks.length} essentials in place
+            </div>
+          </div>
+        </div>
         <div className="flex items-center justify-between">
           <Sparkles size={18} className="text-[#2B5FD9]" fill="#2B5FD9" />
           {suggestions.length > 0 && (
