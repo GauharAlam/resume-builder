@@ -547,7 +547,10 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Guest migration: if user tried without signup, carry their work over
             const guest = !starterResumeData ? loadGuestData() : null;
             const baseData = starterResumeData || guest?.resumeData || initialResumeData;
-            const baseTemplate = guest?.template ?? template;
+            // A template picked on the landing page wins over the current one
+            const pickedTemplate = localStorage.getItem('starter_template') as TemplateID | null;
+            const validTemplates: TemplateID[] = ['professional-it', 'ats-modern', 'standard-classic', 'tech-minimalist', 'clean-serif'];
+            const baseTemplate = (pickedTemplate && validTemplates.includes(pickedTemplate) ? pickedTemplate : null) ?? guest?.template ?? template;
             const baseTitle = starterTitle || guest?.title || 'Untitled Resume';
             const wasFirstResume = stateRef.current.resumeHistory.length === 0;
             const payload = {
@@ -579,6 +582,7 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setSaveStatus('saved');
             localStorage.removeItem('starter_resume_key');
             localStorage.removeItem('starter_resume_title');
+            localStorage.removeItem('starter_template');
             clearGuestData();
 
             if (wasFirstResume) {
