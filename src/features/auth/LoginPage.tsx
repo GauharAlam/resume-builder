@@ -1,8 +1,18 @@
 import React from "react";
 import { SignIn } from "@clerk/clerk-react";
 import { FileText } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/context";
+import { getPostAuthRedirect } from "@/utils/authRedirect";
 
 const LoginPage: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
+  // Where the visitor was headed before being asked to sign in (default: dashboard)
+  const redirectUrl = getPostAuthRedirect();
+
+  // Already signed in: no reason to show the form again
+  if (!loading && isAuthenticated) return <Navigate to={redirectUrl} replace />;
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden"
@@ -50,8 +60,8 @@ const LoginPage: React.FC = () => {
             routing="path"
             path="/login"
             signUpUrl="/register"
-            forceRedirectUrl="/history"
-            fallbackRedirectUrl="/history"
+            forceRedirectUrl={redirectUrl}
+            fallbackRedirectUrl={redirectUrl}
           />
         </div>
       </div>

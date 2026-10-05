@@ -25,6 +25,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { trackEventOncePerSession } from "@/services/analytics";
 import { useAuth } from "@/context";
+import { setPostAuthRedirect } from "@/utils/authRedirect";
 
 const BLUE = "#1456F0";
 const PAGE_BG = "#FAFAFA";
@@ -48,8 +49,8 @@ const CAPABILITIES = [
 
 const FAQS = [
   {
-    q: "Do I need an account to try it?",
-    a: "No. You can open the editor as a guest and your work is saved in this browser. Sign up when you want your resumes saved to your account.",
+    q: "Do I need an account?",
+    a: "Yes. A free account keeps your resumes saved and lets you pick up where you left off on any device. Signing up takes a few seconds.",
   },
   {
     q: "What can the AI help with?",
@@ -107,12 +108,25 @@ const LandingPage: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const startPath = isAuthenticated ? "/history" : "/try";
+  /* The editor needs an account: guests sign up first, then land in a new resume */
+  const handleStart = () => {
+    if (isAuthenticated) {
+      navigate("/history");
+      return;
+    }
+    setPostAuthRedirect("/try");
+    navigate("/register");
+  };
 
   const handleStarterSelect = (starterKey: string, starterTitle: string) => {
     localStorage.setItem("starter_resume_key", starterKey);
     localStorage.setItem("starter_resume_title", starterTitle);
-    navigate(startPath);
+    if (isAuthenticated) {
+      navigate("/try");
+      return;
+    }
+    setPostAuthRedirect("/try");
+    navigate("/register");
   };
 
   return (
@@ -147,7 +161,7 @@ const LandingPage: React.FC = () => {
             </button>
           )}
           <button
-            onClick={() => navigate(startPath)}
+            onClick={handleStart}
             className="rounded-lg bg-[#EDEDED] px-4 sm:px-5 py-2.5 text-[0.95rem] font-medium text-[#2B2B2B] transition-colors hover:bg-[#E2E2E2]"
           >
             {isAuthenticated ? "Go to Dashboard" : "Create My Resume"}
@@ -162,7 +176,7 @@ const LandingPage: React.FC = () => {
             className="animate-fade-rise inline-flex items-center rounded-lg border border-[#CFCFCF] bg-white/60 px-2.5 py-1.5 text-[0.9rem] text-[#2B2B2B]"
             style={{ animationDelay: "0ms" }}
           >
-            Free to try · No signup needed
+            Free to get started
           </div>
 
           <h1
@@ -192,7 +206,7 @@ const LandingPage: React.FC = () => {
             style={{ animationDelay: "360ms" }}
           >
             <button
-              onClick={() => navigate(startPath)}
+              onClick={handleStart}
               className="rounded-lg px-5 py-3 text-[0.98rem] font-medium text-white transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
               style={{ background: BLUE }}
             >
@@ -378,7 +392,7 @@ const LandingPage: React.FC = () => {
             strong results.
           </p>
           <button
-            onClick={() => navigate(startPath)}
+            onClick={handleStart}
             className="mt-8 inline-flex items-center gap-2 rounded-lg px-6 py-3 text-[0.98rem] font-medium text-white transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
             style={{ background: BLUE }}
           >

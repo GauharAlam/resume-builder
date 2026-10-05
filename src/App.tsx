@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { AuthProvider, ThemeProvider } from "./context";
 import { ResumeProvider } from "./hooks";
@@ -142,13 +142,15 @@ const App: React.FC = () => {
                 <Route path="/login/*" element={<LoginPage />} />
                 <Route path="/register/*" element={<RegisterPage />} />
                 <Route path="/view/:shareId" element={<PublicResumePage />} />
-                <Route path="/try" element={<EditorPage />} />
 
                 {/* Private Routes */}
                 <Route element={<ProtectedRoute />}>
+                  {/* /try starts a new resume; it needs an account like the rest of the editor */}
+                  <Route path="/try" element={<EditorPage />} />
                   <Route path="/edit-resume/:id" element={<EditorPage />} />
                   <Route path="/history" element={<ResumeHistory />} />
                 </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
               <ToastHost />
             </div>

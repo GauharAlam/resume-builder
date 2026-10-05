@@ -1,266 +1,278 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useResume } from "@/hooks";
-import { useAuth } from "@/context";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Loader2, FileQuestion, AlertTriangle } from "lucide-react";
+import { useResume } from "@/hooks";
+import { toastError } from "@/utils/toast";
 
-import SidebarV2 from "@/components/editor/v2/Sidebar";
-import EditorPanelV2 from "@/components/editor/v2/EditorPanel";
-import PreviewPanelV2 from "@/components/editor/v2/PreviewPanel";
 import LinkedInImportModal from "@/components/editor/LinkedInImportModal";
 import ShareModal from "@/components/editor/ShareModal";
-import ThemePanel from "@/components/editor/ThemePanel";
 import AIChatPanel from "@/components/editor/AIChatPanel";
-import { Palette } from "lucide-react";
+import AIGenerateResumeModal from "@/components/editor/AIGenerateResumeModal";
+import { EditorAIProvider } from "@/components/editor/v3/EditorAI";
+import { TopNav, DocumentBar } from "@/components/editor/v3/EditorChrome";
+import BuilderPanel, { BuilderSection, BuilderTab } from "@/components/editor/v3/BuilderPanel";
+import Canvas, { CanvasHandle, ExportFormat } from "@/components/editor/v3/Canvas";
+import InspectorPanel from "@/components/editor/v3/InspectorPanel";
+import AnalyzeDrawer, { AnalyzeTab } from "@/components/editor/v3/AnalyzeDrawer";
+import { PrimaryButton, SecondaryButton, cx } from "@/components/editor/v3/ui";
 
-const EditorContent: React.FC = () => {
-  const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+const PAGE_BG = "#F3F4F6";
+
+type MobileTab = "build" | "preview" | "design";
+
+/* ── The editor UI itself (assumes a resume is loaded) ─────── */
+
+export const EditorWorkspace: React.FC = () => {
+  const { activeResumeId, manualSave } = useResume();
+  const canvasRef = useRef<CanvasHandle>(null);
+
+  const [builderTab, setBuilderTab] = useState<BuilderTab>("builder");
+  const [openSection, setOpenSection] = useState<BuilderSection | null>("summary");
+  const [mobileTab, setMobileTab] = useState<MobileTab>("build");
+  const [analyzeTab, setAnalyzeTab] = useState<AnalyzeTab | null>(null);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [jobDescription, setJobDescription] = useState("");
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+
+  // index.html paints the body dark for the rest of the app
+  useEffect(() => {
+    const previous = document.body.style.background;
+    document.body.style.background = PAGE_BG;
+    return () => {
+      document.body.style.background = previous;
+    };
+  }, []);
+
+  // Other parts of the app open these via window events
+  useEffect(() => {
+    const openImport = () => setIsImportOpen(true);
+    const openShare = () => setIsShareOpen(true);
+    window.addEventListener("open-linkedin-modal", openImport);
+    window.addEventListener("open-share-modal", openShare);
+    return () => {
+      window.removeEventListener("open-linkedin-modal", openImport);
+      window.removeEventListener("open-share-modal", openShare);
+    };
+  }, []);
+
+  // Cmd/Ctrl+S saves instead of opening the browser's save dialog
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        manualSave();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [manualSave]);
+
+  const showSection = useCallback((section: BuilderSection) => {
+    setBuilderTab("builder");
+    setOpenSection(section);
+    setMobileTab("build");
+  }, []);
+
+  const closeAnalyze = useCallback(() => setAnalyzeTab(null), []);
+
+  const handleExport = async (format: ExportFormat) => {
+    // The page must be on screen to be captured
+    if (format === "pdf" && mobileTab !== "preview") {
+      setMobileTab("preview");
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    }
+    await canvasRef.current?.exportAs(format);
+  };
+
+  const handleShare = () => {
+    if (!activeResumeId) {
+      toastError("This resume hasn't been saved yet. Wait a moment and try again.");
+      return;
+    }
+    setIsShareOpen(true);
+  };
+
+  const pane = (tab: MobileTab) => cx(mobileTab === tab ? "block" : "hidden", "min-h-0 lg:block");
+
+  return (
+    <EditorAIProvider>
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden font-inter text-[#14161A]" style={{ background: PAGE_BG }}>
+        <TopNav
+          onOpenAnalyze={setAnalyzeTab}
+          onOpenGenerate={() => setIsGenerateOpen(true)}
+          onOpenImport={() => setIsImportOpen(true)}
+          onShowTemplates={() => {
+            setBuilderTab("templates");
+            setMobileTab("build");
+          }}
+        />
+        <DocumentBar
+          exporting={exporting}
+          onExport={handleExport}
+          onAnalyze={() => setAnalyzeTab("ats")}
+          onShare={handleShare}
+        />
+
+        {/* Small screens show one pane at a time */}
+        <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-[#E9EAEE] bg-white p-1.5 lg:hidden" role="tablist" aria-label="Editor panes">
+          {(["build", "preview", "design"] as MobileTab[]).map((tab) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={mobileTab === tab}
+              onClick={() => setMobileTab(tab)}
+              className={cx(
+                "rounded-lg py-2 text-sm font-medium capitalize transition-colors",
+                mobileTab === tab ? "bg-[#EEF3FF] text-[#2B5FD9]" : "text-[#6B7280]",
+              )}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <main className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] lg:grid-cols-[340px_minmax(0,1fr)_300px] xl:grid-cols-[400px_minmax(0,1fr)_340px]">
+          <div className={cx(pane("build"), "p-3 sm:p-5 lg:pr-0")}>
+            <BuilderPanel tab={builderTab} onTabChange={setBuilderTab} openSection={openSection} onOpenSection={setOpenSection} />
+          </div>
+          <div className={cx(pane("preview"), "pt-3 sm:pt-5")}>
+            <Canvas
+              ref={canvasRef}
+              jobDescription={jobDescription}
+              onJobDescriptionChange={setJobDescription}
+              onOpenSection={showSection}
+              onExportingChange={setExporting}
+            />
+          </div>
+          <div className={cx(pane("design"), "p-3 sm:p-5 lg:pl-0")}>
+            <InspectorPanel onOpenSection={showSection} onOpenAnalyze={setAnalyzeTab} />
+          </div>
+        </main>
+
+        <AnalyzeDrawer tab={analyzeTab} onTabChange={setAnalyzeTab} onClose={closeAnalyze} />
+        <AIChatPanel />
+        <LinkedInImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
+        <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
+        <AIGenerateResumeModal isOpen={isGenerateOpen} onClose={() => setIsGenerateOpen(false)} />
+      </div>
+    </EditorAIProvider>
+  );
+};
+
+/* ── Full-page states shown instead of the editor ──────────── */
+
+const StatusScreen: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex h-[100dvh] flex-col items-center justify-center gap-4 px-6 text-center font-inter text-[#14161A]" style={{ background: PAGE_BG }}>
+    {children}
+  </div>
+);
+
+/* ── Route component: decides which resume to open ─────────── */
+
+const EditorPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  const { loadResume, createNewResume, resumeData, isLoading, resumeHistory } =
-    useResume();
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isLinkedInModalOpen, setIsLinkedInModalOpen] = useState(false);
-  // Mobile: tabbed Edit | Preview (desktop shows both side-by-side)
-  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
-  // Guard against duplicate POST /resumes when effect re-fires (StrictMode / resumeHistory updates)
-  const createAttemptedRef = useRef<string | null>(null);
-
+  const { loadResume, createNewResume, isLoading, resumeHistory, activeResumeId } = useResume();
+  const [phase, setPhase] = useState<"loading" | "ready" | "not-found" | "create-failed">("loading");
+  const [attempt, setAttempt] = useState(0);
+  // Which route target has been handled, so re-renders (and StrictMode's
+  // double effect) never create a second resume
+  const handledRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
   useEffect(() => {
-    const handleOpenModal = () => setIsLinkedInModalOpen(true);
-    const handleOpenTheme = () => setIsThemePanelOpen(true);
-    const handleOpenShare = () => setIsShareModalOpen(true);
-    const handleSwitchTab = (e: Event) => {
-      const tab = (e as CustomEvent<"edit" | "preview">).detail;
-      if (tab === "edit" || tab === "preview") setMobileTab(tab);
-    };
-
-    window.addEventListener("open-linkedin-modal", handleOpenModal);
-    window.addEventListener("open-theme-panel", handleOpenTheme);
-    window.addEventListener("open-share-modal", handleOpenShare);
-    window.addEventListener("editor-switch-tab", handleSwitchTab);
-
+    mountedRef.current = true;
     return () => {
-      window.removeEventListener("open-linkedin-modal", handleOpenModal);
-      window.removeEventListener("open-theme-panel", handleOpenTheme);
-      window.removeEventListener("open-share-modal", handleOpenShare);
-      window.removeEventListener("editor-switch-tab", handleSwitchTab);
+      mountedRef.current = false;
     };
   }, []);
 
   useEffect(() => {
-    // Wait for ResumeProvider to finish initial fetch (incl. Clerk token).
-    // Previously: `if (resumeHistory.length === 0 && !id) return;` never set
-    // isLoaded for first-time users -> infinite "Loading your workspace…".
+    // Wait for the resume list (and the auth token behind it)
     if (isLoading) return;
-    if (isLoaded) return;
+    const key = id ?? `new-${attempt}`;
+    if (handledRef.current === key) return;
+    handledRef.current = key;
 
-    const fetchResume = async () => {
-      try {
-        if (id) {
-          await loadResume(id);
-        } else {
-          // Prevent duplicate creation on re-renders / history updates
-          const attemptKey = `create-${resumeHistory.length}`;
-          if (createAttemptedRef.current === attemptKey) return;
-          createAttemptedRef.current = attemptKey;
-
-          const newId = await createNewResume();
-          if (newId) {
-            navigate(`/edit-resume/${newId}`, { replace: true });
-          }
-        }
-      } finally {
-        // Always resolve loading state, even if load/create fails,
-        // so user sees editor with error/save status instead of stuck spinner.
-        setIsLoaded(true);
+    if (id) {
+      if (!resumeHistory.some((r) => r._id === id)) {
+        setPhase("not-found");
+        return;
       }
-    };
+      if (activeResumeId !== id) loadResume(id);
+      setPhase("ready");
+      return;
+    }
 
-    fetchResume();
-  }, [id, isLoading, isLoaded, resumeHistory.length, loadResume, createNewResume, navigate]);
+    // No id in the URL: start a new resume and move to its own URL
+    setPhase("loading");
+    Promise.resolve(createNewResume() as unknown as Promise<string | null>).then((newId) => {
+      if (!mountedRef.current) return;
+      if (newId) {
+        handledRef.current = newId;
+        setPhase("ready");
+        navigate(`/edit-resume/${newId}`, { replace: true });
+      } else {
+        setPhase("create-failed");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isLoading, attempt]);
 
-  if (!isLoaded || isLoading || !resumeData) {
+  if (isLoading || phase === "loading") {
     return (
-      <div
-        className="flex justify-center items-center h-screen"
-        style={{ background: "#0D1512" }}
-      >
-        <div
-          className="text-sm font-semibold"
-          style={{ color: "rgba(209,250,229,0.55)" }}
-        >
-          Loading your workspace…
-        </div>
-      </div>
+      <StatusScreen>
+        <Loader2 className="h-6 w-6 animate-spin text-[#2B5FD9]" />
+        <p className="text-sm text-[#6B7280]">Loading your workspace…</p>
+      </StatusScreen>
     );
   }
 
-  return (
-    <div
-      className="h-[100dvh] w-full flex flex-col overflow-hidden font-sans"
-      style={{ background: "#0D1512", color: "#F0FDF4" }}
-    >
-      {/* Guest try banner */}
-      {!isAuthenticated && (
-        <div
-          className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm shrink-0"
-          style={{
-            background: "rgba(74,222,128,0.10)",
-            borderBottom: "1px solid rgba(74,222,128,0.25)",
-            color: "#F0FDF4",
-          }}
-        >
-          <span className="truncate">
-            Trying as guest — work saves in this browser.
-          </span>
-          <button
-            onClick={() => navigate("/register")}
-            className="px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap"
-            style={{ background: "#4ade80", color: "#052e16" }}
-          >
-            Sign up to save
-          </button>
+  if (phase === "not-found") {
+    return (
+      <StatusScreen>
+        <FileQuestion className="h-9 w-9 text-[#9AA0AB]" />
+        <div>
+          <h1 className="text-lg font-semibold">We couldn't find that resume</h1>
+          <p className="mt-1 max-w-sm text-sm text-[#6B7280]">
+            It may have been deleted, or it belongs to a different account.
+          </p>
         </div>
-      )}
-      {/* Mobile tab bar: Edit | Preview (md+ shows both panes) */}
-      <div
-        className="md:hidden flex items-center gap-1 p-2 shrink-0"
-        style={{
-          background: "rgba(10,17,14,0.95)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        {(["edit", "preview"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setMobileTab(tab)}
-            className="flex-1 px-3 py-2 text-sm font-semibold rounded-lg transition-colors capitalize"
-            style={
-              mobileTab === tab
-                ? {
-                    background: "rgba(74,222,128,0.15)",
-                    border: "1px solid rgba(74,222,128,0.35)",
-                    color: "#4ade80",
-                  }
-                : {
-                    background: "transparent",
-                    border: "1px solid transparent",
-                    color: "rgba(209,250,229,0.55)",
-                  }
-            }
-          >
-            {tab === "edit" ? "Edit" : "Preview"}
-          </button>
-        ))}
-      </div>
+        <div className="flex gap-2">
+          <SecondaryButton onClick={() => navigate("/history")}>My resumes</SecondaryButton>
+          <PrimaryButton onClick={() => navigate("/try")}>Create a new resume</PrimaryButton>
+        </div>
+      </StatusScreen>
+    );
+  }
 
-      {/* Main panes */}
-      <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row md:overflow-hidden">
-      {/* PANE 1: Sidebar Nav (desktop only - mobile uses tab bar) */}
-      <div className="hidden md:flex shrink-0">
-        <SidebarV2 />
-      </div>
-
-      {/* PANE 2: Editor Form (mobile: only when Edit tab active) */}
-      <div
-        className={`${
-          mobileTab === "edit" ? "flex" : "hidden"
-        } md:flex flex-1 md:flex-none min-h-0 flex-col`}
-      >
-        <EditorPanelV2 />
-      </div>
-
-      {/* PANE 3: Live Preview (mobile: only when Preview tab active) */}
-      <div
-        className={`${
-          mobileTab === "preview" ? "flex" : "hidden"
-        } md:flex flex-1 min-h-0 flex-col`}
-      >
-        <PreviewPanelV2 />
-      </div>
-      </div>
-
-      {/* AI Career Chatbot */}
-      <AIChatPanel />
-
-      {/* LinkedIn Import Modal */}
-      <LinkedInImportModal
-        isOpen={isLinkedInModalOpen}
-        onClose={() => setIsLinkedInModalOpen(false)}
-      />
-
-      {/* Share Modal */}
-      <ShareModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-      />
-
-      {/* Theme Sidebar Overlay */}
-      {isThemePanelOpen && (
-        <div className="fixed inset-0 z-[60] flex justify-end">
-          <div
-            className="absolute inset-0 transition-opacity"
-            style={{
-              background: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-            }}
-            onClick={() => setIsThemePanelOpen(false)}
-          />
-          <div
-            className="relative w-80 h-full flex flex-col"
-            style={{
-              background: "rgba(10,17,14,0.97)",
-              backdropFilter: "blur(24px)",
-              WebkitBackdropFilter: "blur(24px)",
-              borderLeft: "1px solid rgba(255,255,255,0.09)",
-              boxShadow: "-24px 0 64px rgba(0,0,0,0.45)",
+  if (phase === "create-failed") {
+    return (
+      <StatusScreen>
+        <AlertTriangle className="h-9 w-9 text-[#F59E0B]" />
+        <div>
+          <h1 className="text-lg font-semibold">We couldn't create your resume</h1>
+          <p className="mt-1 max-w-sm text-sm text-[#6B7280]">
+            The server didn't respond. Check your connection and try again.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <SecondaryButton onClick={() => navigate("/history")}>My resumes</SecondaryButton>
+          <PrimaryButton
+            onClick={() => {
+              setPhase("loading");
+              setAttempt((n) => n + 1);
             }}
           >
-            <div
-              className="p-4 flex items-center justify-between"
-              style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-            >
-              <h2
-                className="text-sm font-black uppercase tracking-widest flex items-center gap-2"
-                style={{ color: "#F0FDF4" }}
-              >
-                <Palette size={16} style={{ color: "#4ade80" }} />
-                Theme Settings
-              </h2>
-              <button
-                onClick={() => setIsThemePanelOpen(false)}
-                className="p-2 rounded-lg transition-colors"
-                style={{ color: "rgba(209,250,229,0.45)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                  e.currentTarget.style.color = "#F0FDF4";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "rgba(209,250,229,0.45)";
-                }}
-              >
-                <span className="text-xl">×</span>
-              </button>
-            </div>
-            <div
-              className="flex-1 overflow-y-auto"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              <ThemePanel />
-            </div>
-          </div>
+            Try again
+          </PrimaryButton>
         </div>
-      )}
-    </div>
-  );
-};
+      </StatusScreen>
+    );
+  }
 
-const EditorPage: React.FC = () => {
-  return <EditorContent />;
+  return <EditorWorkspace />;
 };
 
 export default EditorPage;

@@ -17,8 +17,23 @@ interface FetchOptions extends RequestInit {
   token?: string | null;
 }
 
+// Clerk session tokens expire after about a minute, so a token captured at
+// sign-in goes stale mid-session. Ask Clerk for a current one per request
+// (it caches and refreshes internally) and fall back to the caller's token.
+const getFreshToken = async (): Promise<string | null> => {
+  try {
+    const session = (window as any).Clerk?.session;
+    if (!session) return null;
+    return (await session.getToken()) || null;
+  } catch {
+    return null;
+  }
+};
+
 const apiRequest = async (endpoint: string, options: FetchOptions = {}) => {
-  const { token, ...fetchOptions } = options;
+  const { token: callerToken, ...fetchOptions } = options;
+  // Only authenticated calls pass a `token` option; public ones stay anonymous
+  const token = "token" in options ? (await getFreshToken()) ?? callerToken : callerToken;
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }), // Add token if provided

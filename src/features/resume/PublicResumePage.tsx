@@ -6,6 +6,7 @@ import ProfessionalITTemplate from '@/components/templates/ProfessionalITTemplat
 import ATSModernTemplate from '@/components/templates/ATSModernTemplate';
 import StandardClassicTemplate from '@/components/templates/StandardClassicTemplate';
 import TechMinimalistTemplate from '@/components/templates/TechMinimalistTemplate';
+import CleanSerifTemplate from '@/components/templates/CleanSerifTemplate';
 
 const PublicResumePage: React.FC = () => {
     const { shareId } = useParams<{ shareId: string }>();
@@ -79,6 +80,7 @@ const PublicResumePage: React.FC = () => {
             case 'ats-modern': return <ATSModernTemplate data={resumeData} scale={textScale} />;
             case 'standard-classic': return <StandardClassicTemplate data={resumeData} scale={textScale} />;
             case 'tech-minimalist': return <TechMinimalistTemplate data={resumeData} scale={textScale} />;
+            case 'clean-serif': return <CleanSerifTemplate data={resumeData} scale={textScale} />;
             default: return <ProfessionalITTemplate data={resumeData} scale={textScale} />;
         }
     };
