@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Loader2,
   Maximize2,
+  Minimize2,
   X,
   PanelLeft,
 } from "lucide-react";
@@ -218,7 +219,7 @@ const Canvas = forwardRef<
   const exportingRef = useRef(false);
 
   const [containerWidth, setContainerWidth] = useState(900);
-  const [zoomMode, setZoomMode] = useState<"fit" | number>("fit");
+  const [zoomMode, setZoomMode] = useState<"fit" | "wide" | number>("fit");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [pages, setPages] = useState(1);
@@ -234,7 +235,10 @@ const Canvas = forwardRef<
   const colorRef = useDismiss<HTMLDivElement>(colorOpen, () => setColorOpen(false));
 
   const fitZoom = Math.min(1, Math.max(0.3, (containerWidth - 48) / PAGE_WIDTH));
-  const displayZoom = zoomMode === "fit" ? fitZoom : zoomMode;
+  // "Expand": fill the panel width, and always end up clearly larger than "fit"
+  // (the page scrolls sideways if it is wider than the panel)
+  const wideZoom = Math.min(1.5, Math.max((containerWidth - 48) / PAGE_WIDTH, fitZoom * 1.2, 1));
+  const displayZoom = zoomMode === "fit" ? fitZoom : zoomMode === "wide" ? wideZoom : zoomMode;
   // Capture always happens at 100% so the exported file is not scaled
   const zoom = exporting === "pdf" ? 1 : displayZoom;
 
@@ -539,8 +543,12 @@ const Canvas = forwardRef<
           <IconButton label="Zoom in" disabled={displayZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1] - 0.001} onClick={() => stepZoom(1)}>
             <Plus size={15} />
           </IconButton>
-          <IconButton label="Fit to width" className={cx(zoomMode === "fit" && "bg-[#EEF3FF] text-[#2B5FD9]")} onClick={() => setZoomMode("fit")}>
-            <Maximize2 size={14} />
+          <IconButton
+            label={zoomMode === "wide" ? "Back to fit" : "Expand to full width"}
+            className={cx(zoomMode === "wide" && "bg-[#EEF3FF] text-[#2B5FD9]")}
+            onClick={() => setZoomMode(zoomMode === "wide" ? "fit" : "wide")}
+          >
+            {zoomMode === "wide" ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </IconButton>
 
           {divider}
