@@ -70,7 +70,7 @@ const HomePage: React.FC = () => {
   const handleStarterSelect = (starterKey: string, starterTitle: string) => {
     localStorage.setItem("starter_resume_key", starterKey);
     localStorage.setItem("starter_resume_title", starterTitle);
-    navigate("/register");
+    navigate(isAuthenticated ? "/history" : "/try");
   };
 
   return (
@@ -269,10 +269,10 @@ const HomePage: React.FC = () => {
           style={delay(460)}
         >
           <button
-            onClick={() => navigate(isAuthenticated ? "/history" : "/register")}
+            onClick={() => navigate(isAuthenticated ? "/history" : "/try")}
             className="btn-primary flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm w-full sm:w-auto justify-center"
           >
-            {isAuthenticated ? "Go to Dashboard" : "Start Building Now"}
+            {isAuthenticated ? "Go to Dashboard" : "Try Free — No Signup"}
             <ArrowRight className="w-4 h-4" />
           </button>
           {!isAuthenticated && (
@@ -535,7 +535,7 @@ const HomePage: React.FC = () => {
               into strong results.
             </p>
             <button
-              onClick={() => navigate("/register")}
+              onClick={() => navigate(isAuthenticated ? "/history" : "/try")}
               className="btn-primary inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm"
             >
               Create My Resume

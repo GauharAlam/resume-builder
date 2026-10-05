@@ -15,11 +15,17 @@ const PublicResumePage: React.FC = () => {
 
     useEffect(() => {
         const fetchPublicResume = async () => {
-            if (!shareId) return;
+            if (!shareId) {
+                setError('Missing share link.');
+                setIsLoading(false);
+                return;
+            }
             try {
                 const response = await apiRequest(`/resumes/share/${shareId}`);
-                if (response && response.success && response.data) {
+                if (response && response.success && response.data?.resumeData) {
                     setResumeData(response.data.resumeData);
+                } else {
+                    setError('The resume you are looking for is private or doesn\'t exist.');
                 }
             } catch (err: any) {
                 console.error('Error fetching public resume:', err);
@@ -99,21 +105,29 @@ const PublicResumePage: React.FC = () => {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Resume Not Available</h1>
-                        <p className="text-gray-500 mt-2">{error}</p>
+                        <p className="text-gray-500 mt-2">{error || 'The resume you are looking for is private or doesn\'t exist.'}</p>
                     </div>
-                    <a 
-                        href="/"
-                        className="block w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors no-underline"
-                    >
-                        Create Your Own Resume
-                    </a>
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="block w-full py-3 bg-white text-gray-900 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+                        >
+                            Try Again
+                        </button>
+                        <a 
+                            href="/"
+                            className="block w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors no-underline"
+                        >
+                            Create Your Own Resume
+                        </a>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 py-12 px-4 select-none">
+        <div className="min-h-screen bg-gray-100 py-12 px-4">
             <div className="max-w-5xl mx-auto shadow-2xl rounded-sm overflow-hidden bg-white">
                 {renderTemplate()}
             </div>

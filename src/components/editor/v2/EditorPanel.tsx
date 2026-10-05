@@ -3,6 +3,7 @@ import { useResume } from "@/hooks";
 import SectionCard from "./SectionCard";
 import InputField from "./InputField";
 import { improveText, generateBullets } from "@/services/aiService";
+import { toastError } from "@/utils/toast";
 import { Sparkles, Loader2, Undo2, Redo2, Download } from "lucide-react";
 import { SaveStatusIndicator } from "@/components/common";
 import {
@@ -228,9 +229,12 @@ const EditorPanel: React.FC = () => {
             setAiModal((prev) => ({ ...prev, isOpen: false }));
           },
         });
+      } else {
+        toastError("AI didn't return a suggestion. Please try again.");
       }
     } catch (error) {
       console.error("Failed to improve text", error);
+      toastError("AI improve failed. Check connection and try again.");
     } finally {
       setImprovingId(null);
     }
@@ -287,9 +291,12 @@ const EditorPanel: React.FC = () => {
             setAiModal((prev) => ({ ...prev, isOpen: false }));
           },
         });
+      } else {
+        toastError("AI didn't return bullets. Please try again.");
       }
     } catch (error) {
       console.error("Failed to generate bullets", error);
+      toastError("AI bullet generation failed. Try again.");
     } finally {
       setImprovingId(null);
     }
@@ -369,7 +376,7 @@ const EditorPanel: React.FC = () => {
   return (
     <div
       ref={scrollContainerRef}
-      className="w-1/3 max-w-[500px] min-w-[400px] h-[100dvh] overflow-y-auto p-8 flex-shrink-0 border-r border-gray-200"
+      className="w-full md:w-[380px] lg:w-[440px] xl:w-[500px] md:max-w-[500px] md:min-w-[360px] h-full min-h-0 overflow-y-auto p-4 sm:p-6 md:p-8 flex-shrink-0 md:border-r border-gray-200"
       style={{
         scrollbarWidth: "none",
         msOverflowStyle: "none",
@@ -391,7 +398,7 @@ const EditorPanel: React.FC = () => {
             Update to see changes in real-time.
           </p>
           <div className="mt-2">
-            <SaveStatusIndicator status={saveStatus} />
+            <SaveStatusIndicator status={saveStatus} onRetry={manualSave} />
           </div>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
@@ -498,12 +505,17 @@ const EditorPanel: React.FC = () => {
             JD Match
           </button>
           <button
-            className="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+            className="md:hidden px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
             style={{
               background: "rgba(74,222,128,0.10)",
               border: "1px solid rgba(74,222,128,0.30)",
               color: "#4ade80",
             }}
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("editor-switch-tab", { detail: "preview" })
+              )
+            }
           >
             Preview
           </button>
@@ -655,7 +667,7 @@ const EditorPanel: React.FC = () => {
                 >
                   <button
                     onClick={() => removeLink(link.id)}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
+                    className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
                     style={{ color: "#f87171" }}
                     title="Remove Link"
                   >
@@ -728,7 +740,7 @@ const EditorPanel: React.FC = () => {
               >
                 <button
                   onClick={() => removeExperience(exp.id)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
+                  className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
                   style={{ color: "#f87171" }}
                   title="Remove Experience"
                 >
@@ -830,7 +842,7 @@ const EditorPanel: React.FC = () => {
               >
                 <button
                   onClick={() => removeEducation(edu.id)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
+                  className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
                   style={{ color: "#f87171" }}
                   title="Remove Education"
                 >
@@ -921,7 +933,7 @@ const EditorPanel: React.FC = () => {
               >
                 <button
                   onClick={() => removeProject(proj.id)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
+                  className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
                   style={{ color: "#f87171" }}
                   title="Remove Project"
                 >
@@ -993,7 +1005,7 @@ const EditorPanel: React.FC = () => {
               >
                 <button
                   onClick={() => removeAccomplishment(acc.id)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
+                  className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity rounded hover:bg-[rgba(239,68,68,0.10)]"
                   style={{ color: "#f87171" }}
                   title="Remove Accomplishment"
                 >

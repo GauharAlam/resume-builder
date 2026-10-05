@@ -3,6 +3,13 @@ import { useResume } from "@/hooks";
 import { fetchLinkedInProfile } from "@/services/linkedinService";
 import { Loader2, X } from "lucide-react";
 
+const safeUUID = (): string => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {}
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 interface LinkedInImportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,11 +46,11 @@ const LinkedInImportModal: React.FC<LinkedInImportModalProps> = ({
           phone: data.phone_numbers?.[0] || "",
           location:
             `${data.city || ""}${data.city && data.state ? ", " : ""}${data.state || ""}${data.country_full_name ? ", " + data.country_full_name : ""}`.trim(),
-          links: [{ id: crypto.randomUUID(), name: "LinkedIn", url: url }],
+          links: [{ id: safeUUID(), name: "LinkedIn", url: url }],
         },
         summary: data.about || "",
         experience: (data.experiences || []).map((exp: any) => ({
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           jobTitle: exp.title || "",
           company: exp.company || "",
           startDate: exp.starts_at
@@ -55,7 +62,7 @@ const LinkedInImportModal: React.FC<LinkedInImportModalProps> = ({
           description: exp.description || "",
         })),
         education: (data.education || []).map((edu: any) => ({
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           degree: edu.degree_name || "",
           institution: edu.school || "",
           startDate: edu.starts_at ? `${edu.starts_at.year}` : "",

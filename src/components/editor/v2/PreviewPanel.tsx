@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { useResume } from "@/hooks";
 import { Download, FileText } from "lucide-react";
 import { generateDocx } from "@/utils/docxExport";
+import { toastSuccess, toastError, toastInfo } from "@/utils/toast";
 import { TemplateID } from "@/types";
 import { trackEvent } from "@/services/analytics";
 
@@ -29,6 +30,25 @@ const PreviewPanel: React.FC = () => {
   } = useResume();
   const previewRef = useRef<HTMLDivElement>(null);
   const currentTemplateId = template;
+  const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
+
+  const sanitizeFilename = (name: string): string =>
+    (name || "Resume").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 80) || "Resume";
+
+  const markExported = (format: "pdf" | "docx") => {
+    if (!activeResumeId) return;
+    const storageKey = `resumeExported:${activeResumeId}`;
+    localStorage.setItem(storageKey, "true");
+    window.dispatchEvent(
+      new CustomEvent("resume-exported", {
+        detail: { resumeId: activeResumeId },
+      }),
+    );
+    trackEvent("funnel_resume_exported", {
+      format,
+      resumeId: activeResumeId,
+    });
+  };
 
   const templates: { id: TemplateID; name: string }[] = [
     { id: "professional-it", name: "Professional IT" },
@@ -39,68 +59,70 @@ const PreviewPanel: React.FC = () => {
 
   const handleDownloadPdf = async () => {
     if (!previewRef.current) return;
-    const { jsPDF } = window.jspdf;
-    const html2canvas = window.html2canvas;
+    if (!window.jspdf?.jsPDF || !window.html2canvas) {
+      toastError("PDF library failed to load (ad-blocker or offline). Try DOCX instead.");
+      return;
+    }
+    if (isExporting) return;
+    setIsExporting("pdf");
+    toastInfo("Generating PDF…");
+    try {
+      const { jsPDF } = window.jspdf;
+      const html2canvas = window.html2canvas;
 
-    const canvas = await html2canvas(previewRef.current, {
-      scale: 2,
-      useCORS: true,
-    });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
-
-    // Scale the image so it fits perfectly on a single A4 page
-    const ratio = Math.min(
-      pdfWidth / imgProps.width,
-      pdfHeight / imgProps.height,
-    );
-    const scaledWidth = imgProps.width * ratio;
-    const scaledHeight = imgProps.height * ratio;
-
-    // Center it horizontally
-    const xOffset = (pdfWidth - scaledWidth) / 2;
-
-    pdf.addImage(imgData, "PNG", xOffset, 0, scaledWidth, scaledHeight);
-
-    pdf.save(`${resumeData.personalDetails.fullName || "Resume"}.pdf`);
-
-    if (activeResumeId) {
-      const storageKey = `resumeExported:${activeResumeId}`;
-      localStorage.setItem(storageKey, "true");
-      window.dispatchEvent(
-        new CustomEvent("resume-exported", {
-          detail: { resumeId: activeResumeId },
-        }),
-      );
-      trackEvent("funnel_resume_exported", {
-        format: "pdf",
-        resumeId: activeResumeId,
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 2,
+        useCORS: true,
       });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      // Full-width render, paginated vertically (no more single-page squash)
+      const renderedWidth = pdfWidth;
+      const renderedHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      let heightLeft = renderedHeight;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, renderedWidth, renderedHeight);
+      heightLeft -= pdfHeight;
+      while (heightLeft > 0) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, renderedWidth, renderedHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`${sanitizeFilename(resumeData.personalDetails.fullName)}.pdf`);
+
+      markExported("pdf");
+      toastSuccess("PDF downloaded.");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      toastError("PDF export failed. Try DOCX instead.");
+    } finally {
+      setIsExporting(null);
     }
   };
 
-  const handleDownloadDocx = () => {
-    generateDocx(resumeData);
-    if (activeResumeId) {
-      const storageKey = `resumeExported:${activeResumeId}`;
-      localStorage.setItem(storageKey, "true");
-      window.dispatchEvent(
-        new CustomEvent("resume-exported", {
-          detail: { resumeId: activeResumeId },
-        }),
-      );
-      trackEvent("funnel_resume_exported", {
-        format: "docx",
-        resumeId: activeResumeId,
-      });
+  const handleDownloadDocx = async () => {
+    if (isExporting) return;
+    setIsExporting("docx");
+    try {
+      await generateDocx(resumeData);
+      markExported("docx");
+      toastSuccess("DOCX downloaded.");
+    } catch (err) {
+      console.error("DOCX export failed:", err);
+      toastError("DOCX export failed. Please try again.");
+    } finally {
+      setIsExporting(null);
     }
   };
 
@@ -122,7 +144,7 @@ const PreviewPanel: React.FC = () => {
 
   return (
     <div
-      className="flex-1 h-[100dvh] overflow-y-auto flex flex-col relative"
+      className="flex-1 h-full min-h-0 overflow-y-auto flex flex-col relative w-full"
       style={{
         scrollbarWidth: "none",
         msOverflowStyle: "none",
@@ -131,7 +153,7 @@ const PreviewPanel: React.FC = () => {
     >
       {/* Sticky Top Bar */}
       <div
-        className="sticky top-0 z-20 px-6 py-3 flex justify-between items-center"
+        className="sticky top-0 z-20 px-3 sm:px-6 py-3 flex flex-wrap gap-2 justify-between items-center"
         style={{
           background: "rgba(10,17,14,0.95)",
           backdropFilter: "blur(16px)",
@@ -252,7 +274,8 @@ const PreviewPanel: React.FC = () => {
         <div className="flex gap-2 items-center">
           <button
             onClick={handleDownloadDocx}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all"
+            disabled={isExporting !== null}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all disabled:opacity-50"
             style={{
               background: "rgba(255,255,255,0.07)",
               border: "1px solid rgba(255,255,255,0.11)",
@@ -265,25 +288,26 @@ const PreviewPanel: React.FC = () => {
               e.currentTarget.style.background = "rgba(255,255,255,0.07)";
             }}
           >
-            <FileText size={15} className="text-emerald-600" /> DOCX
+            <FileText size={15} className="text-emerald-600" /> {isExporting === "docx" ? "Saving…" : "DOCX"}
           </button>
           <button
             onClick={handleDownloadPdf}
-            className="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg"
+            disabled={isExporting !== null}
+            className="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg disabled:opacity-50"
           >
-            <Download size={15} /> PDF
+            <Download size={15} /> {isExporting === "pdf" ? "Saving…" : "PDF"}
           </button>
         </div>
       </div>
 
       {/* Content Container */}
       <div
-        className="p-8 pb-32 flex-1 flex justify-center w-full min-h-max overflow-auto"
+        className="p-3 sm:p-8 pb-32 flex-1 flex justify-center w-full min-h-max overflow-auto"
         style={{ background: "#1a2420" }}
       >
         <div
           ref={previewRef}
-          className="w-[794px] min-h-[1123px] shrink-0 bg-white self-start transition-all duration-300"
+          className="w-full max-w-[794px] min-h-[1123px] shrink-0 bg-white self-start transition-all duration-300"
           style={{
             boxShadow:
               "0 24px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)",

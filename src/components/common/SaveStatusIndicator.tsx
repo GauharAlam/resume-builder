@@ -2,10 +2,12 @@ import React from "react";
 
 interface SaveStatusIndicatorProps {
   status: "saving" | "saved" | "error";
+  onRetry?: () => void;
 }
 
 const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   status,
+  onRetry,
 }) => {
   if (status === "saving") {
     return (
@@ -42,10 +44,13 @@ const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
   if (status === "error") {
     return (
-      <div
-        className="flex items-center text-sm transition-opacity duration-300"
+      <button
+        onClick={onRetry}
+        disabled={!onRetry}
+        className="flex items-center text-sm transition-opacity duration-300 disabled:cursor-default"
         style={{ color: "#f87171" }}
         aria-live="polite"
+        title={onRetry ? "Retry save" : undefined}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -62,8 +67,8 @@ const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
             d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-3L13.8 4a2 2 0 00-3.6 0L3.33 16a2 2 0 001.74 3z"
           />
         </svg>
-        Save failed. Try again
-      </div>
+        Save failed. {onRetry ? "Click to retry" : "Try again"}
+      </button>
     );
   }
 

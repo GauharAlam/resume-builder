@@ -20,13 +20,14 @@ export const improveText = async (
   text: string,
   section: string,
   jobTitle: string,
+  instruction?: string,
 ): Promise<string> => {
   if (!text) return "";
   try {
     const token = localStorage.getItem("authToken");
     const response = await apiRequest("/ai/improve-text", {
       method: "POST",
-      body: JSON.stringify({ text, section, jobTitle }),
+      body: JSON.stringify({ text, section, jobTitle, instruction }),
       token,
     });
     return response.success ? response.data : text;

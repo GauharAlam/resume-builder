@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy, Check, Globe, X, Share2, ExternalLink } from "lucide-react";
 import { useResume } from "@/hooks";
+import { toastSuccess, toastError } from "@/utils/toast";
 import { trackEvent } from "@/services/analytics";
 
 interface ShareModalProps {
@@ -13,28 +14,53 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
   const { resumeData, toggleSharing } = useResume();
   const [isCopied, setIsCopied] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const publicUrl = `${window.location.origin}/view/${resumeData.shareId}`;
+  const hasShareId = Boolean(resumeData.shareId);
+  const publicUrl = hasShareId ? `${window.location.origin}/view/${resumeData.shareId}` : "";
   const isPublic = resumeData.isPublic || false;
 
   const handleTogglePublic = async () => {
     setIsUpdating(true);
+    setShareError(null);
     try {
       await toggleSharing(!isPublic);
+      toastSuccess(!isPublic ? "Public sharing enabled." : "Public sharing disabled.");
     } catch (error) {
       console.error("Failed to toggle sharing:", error);
+      setShareError("Couldn't update sharing. Please try again.");
+      toastError("Couldn't update sharing. Please try again.");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(publicUrl);
+  const copyToClipboard = async () => {
+    if (!publicUrl) return;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+    } catch {
+      // Fallback for non-HTTPS / denied clipboard permission
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = publicUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        toastError("Copy failed. Long-press the link to copy manually.");
+        return;
+      }
+    }
     setIsCopied(true);
     if (resumeData.shareId)
       trackEvent("resume_share_link_copied", { shareId: resumeData.shareId });
+    toastSuccess("Link copied.");
     setTimeout(() => setIsCopied(false), 2000);
   };
 
@@ -152,8 +178,20 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
             </button>
           </div>
 
+          {shareError && (
+            <p className="text-xs font-medium" style={{ color: "#f87171" }}>
+              {shareError}
+            </p>
+          )}
+
           {isPublic && (
             <div className="space-y-5">
+              {!hasShareId ? (
+                <p className="text-sm" style={{ color: "rgba(209,250,229,0.6)" }}>
+                  Finishing share setup… close and reopen this dialog in a moment.
+                </p>
+              ) : (
+                <>
               {/* Link */}
               <div className="space-y-2">
                 <label
@@ -229,6 +267,8 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose }) => {
                 <ExternalLink size={15} />
                 Open Live Preview
               </a>
+                </>
+              )}
             </div>
           )}
 

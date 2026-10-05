@@ -6,6 +6,7 @@ import { ResumeProvider } from "./hooks";
 import { HomePage, EditorPage, PublicResumePage } from "./features/resume";
 import { LoginPage, RegisterPage, ProtectedRoute } from "./features/auth";
 import { ResumeHistory } from "./components/editor";
+import { ToastHost } from "./components/common";
 import "./styles/app.css";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -141,6 +142,7 @@ const App: React.FC = () => {
                 <Route path="/login/*" element={<LoginPage />} />
                 <Route path="/register/*" element={<RegisterPage />} />
                 <Route path="/view/:shareId" element={<PublicResumePage />} />
+                <Route path="/try" element={<EditorPage />} />
 
                 {/* Private Routes */}
                 <Route element={<ProtectedRoute />}>
@@ -148,6 +150,7 @@ const App: React.FC = () => {
                   <Route path="/history" element={<ResumeHistory />} />
                 </Route>
               </Routes>
+              <ToastHost />
             </div>
           </ResumeProvider>
         </AuthProvider>

@@ -3,6 +3,13 @@ import { Sparkles, Loader2, X, Wand2, ChevronDown } from "lucide-react";
 import { generateFullResume } from "@/services/aiService";
 import { useResume } from "@/hooks";
 
+const safeUUID = (): string => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {}
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
 const EXPERIENCE_LEVELS = [
   { value: "entry-level", label: "Entry Level (0-2 years)" },
   { value: "mid-level", label: "Mid Level (3-5 years)" },
@@ -64,7 +71,7 @@ const AIGenerateResumeModal: React.FC<AIGenerateResumeModalProps> = ({
 
       if (data.experience && Array.isArray(data.experience)) {
         updates.experience = data.experience.map((exp: any) => ({
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           jobTitle: exp.jobTitle || "",
           company: exp.company || "",
           startDate: exp.startDate || "",
@@ -75,7 +82,7 @@ const AIGenerateResumeModal: React.FC<AIGenerateResumeModalProps> = ({
 
       if (data.education && Array.isArray(data.education)) {
         updates.education = data.education.map((edu: any) => ({
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           degree: edu.degree || "",
           institution: edu.institution || "",
           startDate: edu.startDate || "",
@@ -85,7 +92,7 @@ const AIGenerateResumeModal: React.FC<AIGenerateResumeModalProps> = ({
 
       if (data.projects && Array.isArray(data.projects)) {
         updates.projects = data.projects.map((proj: any) => ({
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           name: proj.name || "",
           url: proj.url || "",
           description: proj.description || "",
@@ -94,7 +101,7 @@ const AIGenerateResumeModal: React.FC<AIGenerateResumeModalProps> = ({
 
       if (data.accomplishments && Array.isArray(data.accomplishments)) {
         updates.accomplishments = data.accomplishments.map((acc: any) => ({
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           description: acc.description || "",
         }));
       }

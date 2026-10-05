@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { ResumeProvider, useResume } from "@/hooks";
+import React, { useState, useEffect, useRef } from "react";
+import { useResume } from "@/hooks";
+import { useAuth } from "@/context";
 import { useParams, useNavigate } from "react-router-dom";
 
 import SidebarV2 from "@/components/editor/v2/Sidebar";
@@ -16,45 +17,69 @@ const EditorContent: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const { loadResume, createNewResume, resumeData, isLoading, resumeHistory } =
     useResume();
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLinkedInModalOpen, setIsLinkedInModalOpen] = useState(false);
+  // Mobile: tabbed Edit | Preview (desktop shows both side-by-side)
+  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  // Guard against duplicate POST /resumes when effect re-fires (StrictMode / resumeHistory updates)
+  const createAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handleOpenModal = () => setIsLinkedInModalOpen(true);
     const handleOpenTheme = () => setIsThemePanelOpen(true);
     const handleOpenShare = () => setIsShareModalOpen(true);
+    const handleSwitchTab = (e: Event) => {
+      const tab = (e as CustomEvent<"edit" | "preview">).detail;
+      if (tab === "edit" || tab === "preview") setMobileTab(tab);
+    };
 
     window.addEventListener("open-linkedin-modal", handleOpenModal);
     window.addEventListener("open-theme-panel", handleOpenTheme);
     window.addEventListener("open-share-modal", handleOpenShare);
+    window.addEventListener("editor-switch-tab", handleSwitchTab);
 
     return () => {
       window.removeEventListener("open-linkedin-modal", handleOpenModal);
       window.removeEventListener("open-theme-panel", handleOpenTheme);
       window.removeEventListener("open-share-modal", handleOpenShare);
+      window.removeEventListener("editor-switch-tab", handleSwitchTab);
     };
   }, []);
 
   useEffect(() => {
+    // Wait for ResumeProvider to finish initial fetch (incl. Clerk token).
+    // Previously: `if (resumeHistory.length === 0 && !id) return;` never set
+    // isLoaded for first-time users -> infinite "Loading your workspace…".
+    if (isLoading) return;
+    if (isLoaded) return;
+
     const fetchResume = async () => {
-      if (resumeHistory.length === 0 && !id) return;
+      try {
+        if (id) {
+          await loadResume(id);
+        } else {
+          // Prevent duplicate creation on re-renders / history updates
+          const attemptKey = `create-${resumeHistory.length}`;
+          if (createAttemptedRef.current === attemptKey) return;
+          createAttemptedRef.current = attemptKey;
 
-      if (id) {
-        await loadResume(id);
-      } else {
-        const newId = await createNewResume();
-        if (newId) {
-          navigate(`/edit-resume/${newId}`, { replace: true });
+          const newId = await createNewResume();
+          if (newId) {
+            navigate(`/edit-resume/${newId}`, { replace: true });
+          }
         }
+      } finally {
+        // Always resolve loading state, even if load/create fails,
+        // so user sees editor with error/save status instead of stuck spinner.
+        setIsLoaded(true);
       }
-
-      setIsLoaded(true);
     };
 
     fetchResume();
-  }, [id, resumeHistory, loadResume, createNewResume, navigate]);
+  }, [id, isLoading, isLoaded, resumeHistory.length, loadResume, createNewResume, navigate]);
 
   if (!isLoaded || isLoading || !resumeData) {
     return (
@@ -74,17 +99,88 @@ const EditorContent: React.FC = () => {
 
   return (
     <div
-      className="h-screen w-full flex overflow-hidden font-sans"
+      className="h-[100dvh] w-full flex flex-col overflow-hidden font-sans"
       style={{ background: "#0D1512", color: "#F0FDF4" }}
     >
-      {/* PANE 1: Sidebar Nav */}
-      <SidebarV2 />
+      {/* Guest try banner */}
+      {!isAuthenticated && (
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm shrink-0"
+          style={{
+            background: "rgba(74,222,128,0.10)",
+            borderBottom: "1px solid rgba(74,222,128,0.25)",
+            color: "#F0FDF4",
+          }}
+        >
+          <span className="truncate">
+            Trying as guest — work saves in this browser.
+          </span>
+          <button
+            onClick={() => navigate("/register")}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap"
+            style={{ background: "#4ade80", color: "#052e16" }}
+          >
+            Sign up to save
+          </button>
+        </div>
+      )}
+      {/* Mobile tab bar: Edit | Preview (md+ shows both panes) */}
+      <div
+        className="md:hidden flex items-center gap-1 p-2 shrink-0"
+        style={{
+          background: "rgba(10,17,14,0.95)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        {(["edit", "preview"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setMobileTab(tab)}
+            className="flex-1 px-3 py-2 text-sm font-semibold rounded-lg transition-colors capitalize"
+            style={
+              mobileTab === tab
+                ? {
+                    background: "rgba(74,222,128,0.15)",
+                    border: "1px solid rgba(74,222,128,0.35)",
+                    color: "#4ade80",
+                  }
+                : {
+                    background: "transparent",
+                    border: "1px solid transparent",
+                    color: "rgba(209,250,229,0.55)",
+                  }
+            }
+          >
+            {tab === "edit" ? "Edit" : "Preview"}
+          </button>
+        ))}
+      </div>
 
-      {/* PANE 2: Editor Form */}
-      <EditorPanelV2 />
+      {/* Main panes */}
+      <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row md:overflow-hidden">
+      {/* PANE 1: Sidebar Nav (desktop only - mobile uses tab bar) */}
+      <div className="hidden md:flex shrink-0">
+        <SidebarV2 />
+      </div>
 
-      {/* PANE 3: Live Preview */}
-      <PreviewPanelV2 />
+      {/* PANE 2: Editor Form (mobile: only when Edit tab active) */}
+      <div
+        className={`${
+          mobileTab === "edit" ? "flex" : "hidden"
+        } md:flex flex-1 md:flex-none min-h-0 flex-col`}
+      >
+        <EditorPanelV2 />
+      </div>
+
+      {/* PANE 3: Live Preview (mobile: only when Preview tab active) */}
+      <div
+        className={`${
+          mobileTab === "preview" ? "flex" : "hidden"
+        } md:flex flex-1 min-h-0 flex-col`}
+      >
+        <PreviewPanelV2 />
+      </div>
+      </div>
 
       {/* AI Career Chatbot */}
       <AIChatPanel />
@@ -164,11 +260,7 @@ const EditorContent: React.FC = () => {
 };
 
 const EditorPage: React.FC = () => {
-  return (
-    <ResumeProvider>
-      <EditorContent />
-    </ResumeProvider>
-  );
+  return <EditorContent />;
 };
 
 export default EditorPage;

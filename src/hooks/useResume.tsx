@@ -5,13 +5,54 @@ import { useAuth } from '@/context';
 import apiRequest from '@/services/api';
 import { trackEvent } from '@/services/analytics';
 
-// --- Debounce utility ---
-const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    return (...args: Parameters<F>) => {
-        if (timeout !== null) clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), waitFor);
+// --- Safe UUID (fallback for environments without crypto.randomUUID) ---
+const safeUUID = (): string => {
+    try {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+    } catch {}
+    return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+};
+
+// --- Guest try mode (localStorage, no signup required) ---
+const GUEST_STORAGE_KEY = 'guest_resume_data_v1';
+
+interface GuestStoredData {
+  resumeData: ResumeData;
+  template: TemplateID;
+  title: string;
+  updatedAt: string;
+}
+
+const loadGuestData = (): GuestStoredData | null => {
+  try {
+    const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GuestStoredData;
+    if (!parsed || typeof parsed !== 'object' || !parsed.resumeData) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const saveGuestData = (resumeData: ResumeData, template: TemplateID, title: string) => {
+  try {
+    const payload: GuestStoredData = {
+      resumeData,
+      template,
+      title,
+      updatedAt: new Date().toISOString(),
     };
+    localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(payload));
+  } catch {}
+};
+
+const clearGuestData = () => {
+  try {
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+  } catch {}
 };
 
 // --- Dummy / Initial Data ---
@@ -22,22 +63,22 @@ const defaultDummyData: ResumeData = {
         email: 'john.doe@email.com',
         phone: '123-456-7890',
         location: 'City, State',
-        links: [{ id: crypto.randomUUID(), name: 'GitHub', url: 'github.com/johndoe' }],
+        links: [{ id: safeUUID(), name: 'GitHub', url: 'github.com/johndoe' }],
     },
     summary: 'A passionate software engineer...',
     experience: [
-        { id: crypto.randomUUID(), jobTitle: 'Frontend Developer', company: 'Tech Solutions Inc.', startDate: 'Jan 2022', endDate: 'Present', description: '• Developed and maintained responsive web applications.' },
+        { id: safeUUID(), jobTitle: 'Frontend Developer', company: 'Tech Solutions Inc.', startDate: 'Jan 2022', endDate: 'Present', description: '• Developed and maintained responsive web applications.' },
     ],
     education: [
-        { id: crypto.randomUUID(), degree: 'B.S. in Computer Science', institution: 'University of Technology', startDate: 'Sep 2018', endDate: 'May 2021' },
+        { id: safeUUID(), degree: 'B.S. in Computer Science', institution: 'University of Technology', startDate: 'Sep 2018', endDate: 'May 2021' },
     ],
     skills: 'JavaScript, TypeScript, React, Node.js, HTML, CSS, Git, SQL',
     projects: [
-        { id: crypto.randomUUID(), name: 'E-commerce Platform', description: '• Full-stack e-commerce website.', url: 'github.com/johndoe/e-commerce' },
+        { id: safeUUID(), name: 'E-commerce Platform', description: '• Full-stack e-commerce website.', url: 'github.com/johndoe/e-commerce' },
     ],
     accomplishments: [
-        { id: crypto.randomUUID(), description: '• Won 1st place in 2020 National Hackathon.' },
-        { id: crypto.randomUUID(), description: '• Certified AWS Solutions Architect - Associate.' },
+        { id: safeUUID(), description: '• Won 1st place in 2020 National Hackathon.' },
+        { id: safeUUID(), description: '• Certified AWS Solutions Architect - Associate.' },
     ],
     sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
     accentColor: '#4F46E5',
@@ -56,10 +97,10 @@ const initialResumeData: ResumeData = {
     },
     summary: 'Results-driven Senior Product Manager with over 8 years of experience in the tech industry. Proven ability to lead cross-functional teams to deliver innovative products that meet user needs and drive business growth.',
     experience: [
-        { id: crypto.randomUUID(), jobTitle: 'Senior Product Manager', company: 'Innovatech Solutions', startDate: 'Jan 2020', endDate: 'Present', description: '• Led the development and launch of a new SaaS platform, resulting in a 30% increase in monthly recurring revenue.\n• Defined product vision, strategy, and roadmap based on market analysis and user feedback.' }
+        { id: safeUUID(), jobTitle: 'Senior Product Manager', company: 'Innovatech Solutions', startDate: 'Jan 2020', endDate: 'Present', description: '• Led the development and launch of a new SaaS platform, resulting in a 30% increase in monthly recurring revenue.\n• Defined product vision, strategy, and roadmap based on market analysis and user feedback.' }
     ],
     education: [
-        { id: crypto.randomUUID(), degree: 'Master of Business Administration (MBA)', institution: 'Stanford University', startDate: '2015', endDate: '2017' }
+        { id: safeUUID(), degree: 'Master of Business Administration (MBA)', institution: 'Stanford University', startDate: '2015', endDate: '2017' }
     ],
     skills: 'Product Management, Agile Methodologies, JIRA, Roadmapping, User Research, A/B Testing, Data Analysis',
 };
@@ -76,12 +117,12 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
                     email: 'alex.morgan@email.com',
                     phone: '555-222-1100',
                     location: 'Austin, TX',
-                    links: [{ id: crypto.randomUUID(), name: 'GitHub', url: 'github.com/alexmorgan' }],
+                    links: [{ id: safeUUID(), name: 'GitHub', url: 'github.com/alexmorgan' }],
                 },
                 summary: 'Results-driven Software Engineer with 4+ years of experience building scalable web applications, improving performance, and shipping product features used by thousands of users.',
                 experience: [
                     {
-                        id: crypto.randomUUID(),
+                        id: safeUUID(),
                         jobTitle: 'Software Engineer',
                         company: 'NovaTech',
                         startDate: 'Mar 2022',
@@ -90,14 +131,14 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
                     }
                 ],
                 education: [
-                    { id: crypto.randomUUID(), degree: 'B.S. Computer Science', institution: 'University of Texas', startDate: '2017', endDate: '2021' },
+                    { id: safeUUID(), degree: 'B.S. Computer Science', institution: 'University of Texas', startDate: '2017', endDate: '2021' },
                 ],
                 skills: 'TypeScript, React, Node.js, Express, PostgreSQL, Redis, AWS, Docker, Git, REST APIs',
                 projects: [
-                    { id: crypto.randomUUID(), name: 'Real-time Collaboration Tool', description: '• Developed live editing and comments with websocket architecture supporting 5k+ sessions.', url: 'github.com/alexmorgan/collab-tool' },
+                    { id: safeUUID(), name: 'Real-time Collaboration Tool', description: '• Developed live editing and comments with websocket architecture supporting 5k+ sessions.', url: 'github.com/alexmorgan/collab-tool' },
                 ],
                 accomplishments: [
-                    { id: crypto.randomUUID(), description: '• Mentored 3 junior engineers and improved onboarding speed by 30%.' },
+                    { id: safeUUID(), description: '• Mentored 3 junior engineers and improved onboarding speed by 30%.' },
                 ],
                 sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
                 accentColor: '#059669',
@@ -111,12 +152,12 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
                     email: 'taylor.reed@email.com',
                     phone: '555-778-3400',
                     location: 'Seattle, WA',
-                    links: [{ id: crypto.randomUUID(), name: 'LinkedIn', url: 'linkedin.com/in/taylorreed' }],
+                    links: [{ id: safeUUID(), name: 'LinkedIn', url: 'linkedin.com/in/taylorreed' }],
                 },
                 summary: 'Strategic Product Manager with 6+ years of experience leading cross-functional teams, defining product roadmaps, and delivering customer-centered SaaS solutions.',
                 experience: [
                     {
-                        id: crypto.randomUUID(),
+                        id: safeUUID(),
                         jobTitle: 'Senior Product Manager',
                         company: 'CloudFlow',
                         startDate: 'Jan 2021',
@@ -125,14 +166,14 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
                     }
                 ],
                 education: [
-                    { id: crypto.randomUUID(), degree: 'MBA', institution: 'University of Washington', startDate: '2016', endDate: '2018' },
+                    { id: safeUUID(), degree: 'MBA', institution: 'University of Washington', startDate: '2016', endDate: '2018' },
                 ],
                 skills: 'Product Strategy, Roadmapping, User Research, A/B Testing, SQL, Agile, Jira, Stakeholder Management, Data Analysis',
                 projects: [
-                    { id: crypto.randomUUID(), name: 'Self-Serve Onboarding Revamp', description: '• Led product discovery and launch resulting in faster time-to-value for new users.' },
+                    { id: safeUUID(), name: 'Self-Serve Onboarding Revamp', description: '• Led product discovery and launch resulting in faster time-to-value for new users.' },
                 ],
                 accomplishments: [
-                    { id: crypto.randomUUID(), description: '• Presented quarterly product review to executive leadership and secured additional headcount.' },
+                    { id: safeUUID(), description: '• Presented quarterly product review to executive leadership and secured additional headcount.' },
                 ],
                 sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
                 accentColor: '#0EA5E9',
@@ -146,12 +187,12 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
                     email: 'jordan.lee@email.com',
                     phone: '555-981-4432',
                     location: 'San Diego, CA',
-                    links: [{ id: crypto.randomUUID(), name: 'Portfolio', url: 'dribbble.com/jordanlee' }],
+                    links: [{ id: safeUUID(), name: 'Portfolio', url: 'dribbble.com/jordanlee' }],
                 },
                 summary: 'Creative UI/UX Designer focused on building intuitive, accessible digital products with strong visual systems and measurable business outcomes.',
                 experience: [
                     {
-                        id: crypto.randomUUID(),
+                        id: safeUUID(),
                         jobTitle: 'Product Designer',
                         company: 'PixelPath',
                         startDate: 'May 2020',
@@ -160,14 +201,14 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
                     }
                 ],
                 education: [
-                    { id: crypto.randomUUID(), degree: 'B.A. Design', institution: 'California State University', startDate: '2015', endDate: '2019' },
+                    { id: safeUUID(), degree: 'B.A. Design', institution: 'California State University', startDate: '2015', endDate: '2019' },
                 ],
                 skills: 'Figma, Prototyping, Interaction Design, Design Systems, User Research, Usability Testing, Information Architecture, Accessibility',
                 projects: [
-                    { id: crypto.randomUUID(), name: 'Mobile Banking Redesign', description: '• Delivered a mobile-first redesign focused on trust, clarity, and task completion.' },
+                    { id: safeUUID(), name: 'Mobile Banking Redesign', description: '• Delivered a mobile-first redesign focused on trust, clarity, and task completion.' },
                 ],
                 accomplishments: [
-                    { id: crypto.randomUUID(), description: '• Won internal innovation award for onboarding flow concepts.' },
+                    { id: safeUUID(), description: '• Won internal innovation award for onboarding flow concepts.' },
                 ],
                 sectionOrder: ['summary', 'experience', 'projects', 'education', 'skills', 'accomplishments'],
                 accentColor: '#F59E0B',
@@ -182,9 +223,11 @@ const buildStarterResumeData = (starterKey: string | null): ResumeData | null =>
 interface SavedResume {
     _id: string;
     title: string;
-    resumeData: ResumeData;
+    resumeData: ResumeData & { template?: TemplateID };
     updatedAt: string;
     createdAt: string;
+    isPublic?: boolean;
+    shareId?: string;
 }
 
 interface ResumeContextType {
@@ -244,22 +287,28 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [history, setHistory] = useState<ResumeData[]>([resumeData]);
     const [historyIndex, setHistoryIndex] = useState(0);
 
-    const stateRef = useRef({ resumeData, history, historyIndex, activeResumeId, currentTitle, resumeHistory });
-    stateRef.current = { resumeData, history, historyIndex, activeResumeId, currentTitle, resumeHistory };
+    const stateRef = useRef({ resumeData, history, historyIndex, activeResumeId, currentTitle, resumeHistory, template });
+    stateRef.current = { resumeData, history, historyIndex, activeResumeId, currentTitle, resumeHistory, template };
 
     // Loading & lastSaved
     const isLoadingRef = useRef(false);
     const lastSavedData = useRef<ResumeData>(resumeData);
+    const lastSavedTemplate = useRef<TemplateID>('professional-it');
+    const lastSavedTitle = useRef<string>('Untitled Resume (Example)');
 
     // --- Update State & History ---
     const updateStateAndHistory = (newData: ResumeData, isNewLoad: boolean = false) => {
         let newHistory: ResumeData[];
-        if (isNewLoad && stateRef.current.activeResumeId) {
+        if (isNewLoad) {
             newHistory = [newData];
         } else {
             newHistory = stateRef.current.history.slice(0, stateRef.current.historyIndex + 1);
             if (newHistory.length === 0 || newHistory[newHistory.length - 1] !== newData) {
                 newHistory.push(newData);
+                // Cap history to 50 entries to prevent unbounded memory growth
+                if (newHistory.length > 50) {
+                    newHistory = newHistory.slice(newHistory.length - 50);
+                }
             }
         }
         setHistory(newHistory);
@@ -293,26 +342,72 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             isLoadingRef.current = true;
             setActiveResumeId(resumeToLoad._id);
             setCurrentTitle(resumeToLoad.title);
+            // Extract template if persisted inside resumeData, keep it in UI state
+            const persistedTemplate = (resumeToLoad.resumeData as any)?.template as TemplateID | undefined;
+            const effectiveTemplate = persistedTemplate ?? 'professional-it';
+            setTemplateState(effectiveTemplate);
+            const { template: _ignored, ...cleanResumeData } = resumeToLoad.resumeData as any;
             const combinedData = { 
-                ...resumeToLoad.resumeData, 
+                ...cleanResumeData, 
                 isPublic: resumeToLoad.isPublic, 
                 shareId: resumeToLoad.shareId 
-            };
+            } as ResumeData;
             updateStateAndHistory(combinedData, true);
-            // Update lastSavedData to match the loaded resume so save status is accurate
+            // Update lastSaved refs to match the loaded resume so save status is accurate
             lastSavedData.current = combinedData;
+            lastSavedTemplate.current = effectiveTemplate;
+            lastSavedTitle.current = resumeToLoad.title;
+            setSaveStatus('saved');
             setTimeout(() => { isLoadingRef.current = false; }, 0);
         }
     }, []);
 
     // --- Fetch Resumes ---
     const fetchResumes = useCallback(async () => {
-        if (!isAuthenticated || !token) {
-            updateStateAndHistory(defaultDummyData, true);
-            lastSavedData.current = defaultDummyData;
-            setActiveResumeId(null);
-            setCurrentTitle('Untitled Resume (Example)');
+        if (!isAuthenticated) {
+            // Guest try mode: starter selection > saved guest work > dummy
+            try {
+                const starterKey = localStorage.getItem('starter_resume_key');
+                const starterTitle = localStorage.getItem('starter_resume_title');
+                const starterData = buildStarterResumeData(starterKey);
+                if (starterData) {
+                    updateStateAndHistory(starterData, true);
+                    lastSavedData.current = starterData;
+                    lastSavedTemplate.current = 'professional-it';
+                    lastSavedTitle.current = starterTitle || 'Untitled Resume';
+                    setTemplateState('professional-it');
+                    setActiveResumeId(null);
+                    setCurrentTitle(starterTitle || 'Untitled Resume');
+                    saveGuestData(starterData, 'professional-it', starterTitle || 'Untitled Resume');
+                    localStorage.removeItem('starter_resume_key');
+                    localStorage.removeItem('starter_resume_title');
+                    setIsLoading(false);
+                    return;
+                }
+            } catch {}
+            const guest = loadGuestData();
+            if (guest) {
+                updateStateAndHistory(guest.resumeData, true);
+                lastSavedData.current = guest.resumeData;
+                lastSavedTemplate.current = guest.template;
+                lastSavedTitle.current = guest.title;
+                setTemplateState(guest.template);
+                setActiveResumeId(null);
+                setCurrentTitle(guest.title);
+            } else {
+                updateStateAndHistory(defaultDummyData, true);
+                lastSavedData.current = defaultDummyData;
+                lastSavedTemplate.current = 'professional-it';
+                lastSavedTitle.current = 'Untitled Resume (Example)';
+                setActiveResumeId(null);
+                setCurrentTitle('Untitled Resume (Example)');
+            }
             setIsLoading(false);
+            return;
+        }
+        // Wait for Clerk token to be available before hitting authenticated endpoints
+        if (!token) {
+            setIsLoading(true);
             return;
         }
 
@@ -331,18 +426,27 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     isLoadingRef.current = true;
                     setActiveResumeId(firstResume._id);
                     setCurrentTitle(firstResume.title);
+                    const persistedTemplate = (firstResume.resumeData as any)?.template as TemplateID | undefined;
+                    const effectiveTemplate = persistedTemplate ?? 'professional-it';
+                    setTemplateState(effectiveTemplate);
+                    const { template: _ignored, ...cleanResumeData } = firstResume.resumeData as any;
                     const combinedData = { 
-                        ...firstResume.resumeData, 
+                        ...cleanResumeData, 
                         isPublic: firstResume.isPublic, 
                         shareId: firstResume.shareId 
-                    };
+                    } as ResumeData;
                     updateStateAndHistory(combinedData, true);
                     lastSavedData.current = combinedData;
+                    lastSavedTemplate.current = effectiveTemplate;
+                    lastSavedTitle.current = firstResume.title;
+                    setSaveStatus('saved');
                     setTimeout(() => { isLoadingRef.current = false; }, 0);
                 }
             } else {
                 updateStateAndHistory(defaultDummyData, true);
                 lastSavedData.current = defaultDummyData;
+                lastSavedTemplate.current = 'professional-it';
+                lastSavedTitle.current = 'Untitled Resume (Example)';
                 setActiveResumeId(null);
                 setCurrentTitle('Untitled Resume (Example)');
             }
@@ -350,6 +454,8 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error("Failed to fetch resumes:", error);
             updateStateAndHistory(defaultDummyData, true);
             lastSavedData.current = defaultDummyData;
+            lastSavedTemplate.current = 'professional-it';
+            lastSavedTitle.current = 'Untitled Resume (Example)';
             setActiveResumeId(null);
             setCurrentTitle('Untitled Resume (Example)');
         } finally {
@@ -358,14 +464,17 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [token, isAuthenticated]);
 
     // --- Save Resume ---
-    const saveResume = useCallback(async (dataToSave: ResumeData, idToSave: string | null, titleToSave: string) => {
-        if (!isAuthenticated || !token || (idToSave === null && dataToSave === defaultDummyData)) return;
+    const saveResume = useCallback(async (dataToSave: ResumeData, idToSave: string | null, titleToSave: string, templateToSave?: TemplateID) => {
+        if (!isAuthenticated || !token) return;
+        // Prevent saving unmodified dummy placeholder as a new resume when no active ID
+        if (idToSave === null && JSON.stringify(dataToSave) === JSON.stringify(defaultDummyData)) return;
 
+        const effectiveTemplate = templateToSave ?? stateRef.current.template;
         setSaveStatus('saving');
         try {
             const payload = { 
                 title: titleToSave || 'Untitled Resume', 
-                resumeData: { ...dataToSave, template } 
+                resumeData: { ...dataToSave, template: effectiveTemplate } 
             };
             const response = await apiRequest(idToSave ? `/resumes/${idToSave}` : '/resumes', { 
                 method: idToSave ? 'PUT' : 'POST', 
@@ -382,7 +491,9 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setCurrentTitle(savedResume.title);
                     setResumeHistory(prev => [savedResume, ...prev].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
                 }
-                lastSavedData.current = dataToSave;
+                lastSavedData.current = JSON.parse(JSON.stringify(dataToSave)) as ResumeData;
+                lastSavedTemplate.current = effectiveTemplate;
+                lastSavedTitle.current = titleToSave || 'Untitled Resume';
             }
             setSaveStatus('saved');
         } catch (error) {
@@ -394,15 +505,33 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // --- Manual Save Function ---
     const manualSave = useCallback(() => {
         if (isLoadingRef.current) return;
-        if (JSON.stringify(stateRef.current.resumeData) !== JSON.stringify(lastSavedData.current)) {
-            saveResume(stateRef.current.resumeData, stateRef.current.activeResumeId, stateRef.current.currentTitle);
+        const s = stateRef.current;
+        // Guest try mode: persist locally so refresh doesn't lose work
+        if (!isAuthenticated) {
+            saveGuestData(s.resumeData, s.template, s.currentTitle);
+            lastSavedData.current = JSON.parse(JSON.stringify(s.resumeData)) as ResumeData;
+            lastSavedTemplate.current = s.template;
+            lastSavedTitle.current = s.currentTitle;
+            setSaveStatus('saved');
+            return;
         }
-    }, [saveResume]);
+        const isDirty =
+            JSON.stringify(s.resumeData) !== JSON.stringify(lastSavedData.current) ||
+            s.template !== lastSavedTemplate.current ||
+            s.currentTitle !== lastSavedTitle.current;
+        if (isDirty) {
+            saveResume(s.resumeData, s.activeResumeId, s.currentTitle, s.template);
+        }
+    }, [saveResume, isAuthenticated]);
 
-    // --- Track unsaved changes ---
+    // --- Track unsaved changes (data + template + title) ---
     const hasUnsavedChanges = useMemo(() => {
-        return JSON.stringify(resumeData) !== JSON.stringify(lastSavedData.current);
-    }, [resumeData]);
+        return (
+            JSON.stringify(resumeData) !== JSON.stringify(lastSavedData.current) ||
+            template !== lastSavedTemplate.current ||
+            currentTitle !== lastSavedTitle.current
+        );
+    }, [resumeData, template, currentTitle]);
 
     // --- Other handlers ---
     const updateResumeData = (updates: Partial<ResumeData>) => updateStateAndHistory({ ...stateRef.current.resumeData, ...updates });
@@ -415,10 +544,15 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const starterKey = localStorage.getItem('starter_resume_key');
             const starterTitle = localStorage.getItem('starter_resume_title');
             const starterResumeData = buildStarterResumeData(starterKey);
+            // Guest migration: if user tried without signup, carry their work over
+            const guest = !starterResumeData ? loadGuestData() : null;
+            const baseData = starterResumeData || guest?.resumeData || initialResumeData;
+            const baseTemplate = guest?.template ?? template;
+            const baseTitle = starterTitle || guest?.title || 'Untitled Resume';
             const wasFirstResume = stateRef.current.resumeHistory.length === 0;
             const payload = {
-                title: starterTitle || 'Untitled Resume',
-                resumeData: starterResumeData || initialResumeData
+                title: baseTitle,
+                resumeData: { ...baseData, template: baseTemplate }
             };
             const response = await apiRequest('/resumes', {
                 method: 'POST',
@@ -434,14 +568,22 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setActiveResumeId(savedResume._id);
             setCurrentTitle(savedResume.title);
             setResumeHistory(prev => [savedResume, ...prev].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
-            updateStateAndHistory(savedResume.resumeData, true);
+            // Strip template from persisted data for local state
+            const { template: _t, ...cleanData } = savedResume.resumeData as any;
+            const persistedTemplate = (_t as TemplateID | undefined) ?? stateRef.current.template;
+            setTemplateState(persistedTemplate);
+            updateStateAndHistory(cleanData as ResumeData, true);
+            lastSavedData.current = JSON.parse(JSON.stringify(cleanData)) as ResumeData;
+            lastSavedTemplate.current = persistedTemplate;
+            lastSavedTitle.current = savedResume.title;
             setSaveStatus('saved');
             localStorage.removeItem('starter_resume_key');
             localStorage.removeItem('starter_resume_title');
+            clearGuestData();
 
             if (wasFirstResume) {
                 trackEvent('funnel_first_resume_created', {
-                    source: starterKey || 'blank',
+                    source: starterKey || (guest ? 'guest-try' : 'blank'),
                     resumeId: savedResume._id,
                 });
             }
@@ -452,7 +594,7 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setSaveStatus('error');
             return null;
         }
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated, token, template]);
 
     const deleteResume = useCallback(async (resumeId: string) => {
         if (!isAuthenticated || !token) return;
@@ -474,27 +616,27 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const titleToSave = newTitle || 'Untitled Resume';
         setCurrentTitle(titleToSave);
         if (stateRef.current.activeResumeId || stateRef.current.resumeData !== defaultDummyData) {
-            saveResume(stateRef.current.resumeData, stateRef.current.activeResumeId, titleToSave);
+            saveResume(stateRef.current.resumeData, stateRef.current.activeResumeId, titleToSave, stateRef.current.template);
         }
     }, [saveResume]);
 
-    const addExperience = () => updateField('experience', [...(stateRef.current.resumeData.experience || []), { id: crypto.randomUUID(), jobTitle: '', company: '', startDate: '', endDate: '', description: '' }]);
+    const addExperience = () => updateField('experience', [...(stateRef.current.resumeData.experience || []), { id: safeUUID(), jobTitle: '', company: '', startDate: '', endDate: '', description: '' }]);
     const updateExperience = (id: string, updated: Experience) => updateField('experience', (stateRef.current.resumeData.experience || []).map(exp => exp.id === id ? updated : exp));
     const removeExperience = (id: string) => updateField('experience', (stateRef.current.resumeData.experience || []).filter(exp => exp.id !== id));
 
-    const addEducation = () => updateField('education', [...(stateRef.current.resumeData.education || []), { id: crypto.randomUUID(), degree: '', institution: '', startDate: '', endDate: '' }]);
+    const addEducation = () => updateField('education', [...(stateRef.current.resumeData.education || []), { id: safeUUID(), degree: '', institution: '', startDate: '', endDate: '' }]);
     const updateEducation = (id: string, updated: Education) => updateField('education', (stateRef.current.resumeData.education || []).map(edu => edu.id === id ? updated : edu));
     const removeEducation = (id: string) => updateField('education', (stateRef.current.resumeData.education || []).filter(edu => edu.id !== id));
 
-    const addLink = () => updateField('personalDetails', { ...stateRef.current.resumeData.personalDetails, links: [...(stateRef.current.resumeData.personalDetails.links || []), { id: crypto.randomUUID(), name: '', url: '' }] });
+    const addLink = () => updateField('personalDetails', { ...stateRef.current.resumeData.personalDetails, links: [...(stateRef.current.resumeData.personalDetails.links || []), { id: safeUUID(), name: '', url: '' }] });
     const updateLink = (id: string, updated: Link) => updateField('personalDetails', { ...stateRef.current.resumeData.personalDetails, links: (stateRef.current.resumeData.personalDetails.links || []).map(link => link.id === id ? updated : link) });
     const removeLink = (id: string) => updateField('personalDetails', { ...stateRef.current.resumeData.personalDetails, links: (stateRef.current.resumeData.personalDetails.links || []).filter(link => link.id !== id) });
 
-    const addProject = () => updateField('projects', [...(stateRef.current.resumeData.projects || []), { id: crypto.randomUUID(), name: '', description: '', url: '' }]);
+    const addProject = () => updateField('projects', [...(stateRef.current.resumeData.projects || []), { id: safeUUID(), name: '', description: '', url: '' }]);
     const updateProject = (id: string, updated: Project) => updateField('projects', (stateRef.current.resumeData.projects || []).map(proj => proj.id === id ? updated : proj));
     const removeProject = (id: string) => updateField('projects', (stateRef.current.resumeData.projects || []).filter(proj => proj.id !== id));
 
-    const addAccomplishment = () => updateField('accomplishments', [...(stateRef.current.resumeData.accomplishments || []), { id: crypto.randomUUID(), description: '' }]);
+    const addAccomplishment = () => updateField('accomplishments', [...(stateRef.current.resumeData.accomplishments || []), { id: safeUUID(), description: '' }]);
     const updateAccomplishment = (id: string, updated: Accomplishment) => updateField('accomplishments', (stateRef.current.resumeData.accomplishments || []).map(acc => acc.id === id ? updated : acc));
     const removeAccomplishment = (id: string) => updateField('accomplishments', (stateRef.current.resumeData.accomplishments || []).filter(acc => acc.id !== id));
 
@@ -530,6 +672,68 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             throw error;
         }
     };
+
+    // --- Autosave (debounced 1.5s) + tab-close protection ---
+    // Watches data + template + title. Skips while loading / unauthenticated.
+    useEffect(() => {
+        if (!isAuthenticated || !token) return;
+        if (isLoading || isLoadingRef.current) return;
+
+        const isDirty =
+            JSON.stringify(resumeData) !== JSON.stringify(lastSavedData.current) ||
+            template !== lastSavedTemplate.current ||
+            currentTitle !== lastSavedTitle.current;
+        if (!isDirty) return;
+
+        // Immediate feedback so UI never falsely shows "All changes saved" while debouncing
+        setSaveStatus((prev) => (prev === 'saved' ? 'saving' : prev));
+
+        const t = setTimeout(() => {
+            if (isLoadingRef.current) return;
+            const s = stateRef.current;
+            saveResume(s.resumeData, s.activeResumeId, s.currentTitle, s.template);
+        }, 1500);
+
+        return () => clearTimeout(t);
+    }, [resumeData, template, currentTitle, isAuthenticated, token, isLoading, saveResume]);
+
+    // --- Guest autosave to localStorage (no account needed) ---
+    useEffect(() => {
+        if (isAuthenticated) return;
+        if (isLoading || isLoadingRef.current) return;
+
+        const isDirty =
+            JSON.stringify(resumeData) !== JSON.stringify(lastSavedData.current) ||
+            template !== lastSavedTemplate.current ||
+            currentTitle !== lastSavedTitle.current;
+        if (!isDirty) return;
+
+        const t = setTimeout(() => {
+            const s = stateRef.current;
+            saveGuestData(s.resumeData, s.template, s.currentTitle);
+            lastSavedData.current = JSON.parse(JSON.stringify(s.resumeData)) as ResumeData;
+            lastSavedTemplate.current = s.template;
+            lastSavedTitle.current = s.currentTitle;
+            setSaveStatus('saved');
+        }, 800);
+
+        return () => clearTimeout(t);
+    }, [resumeData, template, currentTitle, isAuthenticated, isLoading]);
+
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            const s = stateRef.current;
+            const isDirty =
+                JSON.stringify(s.resumeData) !== JSON.stringify(lastSavedData.current) ||
+                s.template !== lastSavedTemplate.current ||
+                s.currentTitle !== lastSavedTitle.current;
+            if (isDirty) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, []);
 
     // --- Context Value ---
     const value = useMemo(() => ({

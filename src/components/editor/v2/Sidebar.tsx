@@ -111,6 +111,8 @@ const Sidebar: React.FC = () => {
             <div key={isActive ? `${idx}-active-${activeItem}` : idx} className="relative group">
               <button
                 data-sidebar-idx={idx}
+                aria-label={sectionNames[idx]}
+                title={sectionNames[idx]}
                 className={`p-2.5 rounded-xl flex items-center justify-center w-full transition-all duration-200${isActive ? " sidebar-icon-glow" : ""}`}
                 style={{
                   background: isActive ? "rgba(74,222,128,0.13)" : "transparent",
@@ -180,6 +182,8 @@ const Sidebar: React.FC = () => {
           ].map(({ icon: Icon, title, event, color, bg, border, accentBorder }) => (
             <div key={title} className="relative group">
               <button
+                aria-label={title}
+                title={title}
                 className="p-2.5 rounded-xl flex items-center justify-center w-full transition-all duration-150"
                 style={{
                   color: "rgba(209,250,229,0.45)",

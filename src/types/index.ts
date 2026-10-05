@@ -106,7 +106,8 @@ export type TemplateID =
   | "professional-it"
   | "ats-modern"
   | "standard-classic"
-  | "tech-minimalist";
+  | "tech-minimalist"
+  | "clean-serif";
 
 export type SaveStatus = "saving" | "saved" | "error";
 
